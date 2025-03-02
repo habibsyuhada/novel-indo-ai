@@ -32,6 +32,9 @@ export default function ChapterPage() {
   const currentParagraphIndex = useRef<number>(0);
   const paragraphElementsRef = useRef<(HTMLParagraphElement | null)[]>([]);
   const wasPlayingBeforeHidden = useRef<boolean>(false);
+  const [showAndroidWarning, setShowAndroidWarning] = useState(false);
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isAndroid = useRef<boolean>(false);
   
   // Define WakeLock types
   type WakeLockSentinel = {
@@ -51,11 +54,25 @@ export default function ChapterPage() {
 
   const [isMobile, setIsMobile] = useState(false);
 
-  // Check if device is mobile
+  // Check if device is mobile and detect Android
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
+    
+    // Check if device is Android
+    if (typeof navigator !== 'undefined') {
+      isAndroid.current = /android/i.test(navigator.userAgent);
+      
+      // Create silent audio element for Android
+      if (isAndroid.current) {
+        // Create a silent audio element that will keep the process alive
+        const audioElement = document.createElement('audio');
+        audioElement.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        audioElement.loop = true;
+        silentAudioRef.current = audioElement;
+      }
+    }
     
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -242,6 +259,12 @@ export default function ChapterPage() {
       setIsPaused(false);
       currentParagraphIndex.current = 0;
       setCurrentHighlightIndex(-1);
+      
+      // Stop silent audio if it's playing (for Android)
+      if (silentAudioRef.current) {
+        silentAudioRef.current.pause();
+      }
+      
       return;
     }
     
@@ -255,6 +278,18 @@ export default function ChapterPage() {
     
     utterance.onstart = () => {
       setCurrentHighlightIndex(currentParagraphIndex.current);
+      
+      // Start playing silent audio to keep process alive on Android
+      if (isAndroid.current && silentAudioRef.current) {
+        silentAudioRef.current.play().catch(err => {
+          console.error('Failed to play silent audio:', err);
+        });
+        
+        // Show Android warning once
+        if (!showAndroidWarning) {
+          setShowAndroidWarning(true);
+        }
+      }
     };
     
     utterance.onend = () => {
@@ -267,6 +302,11 @@ export default function ChapterPage() {
       setIsSpeaking(false);
       setIsPaused(false);
       setCurrentHighlightIndex(-1);
+      
+      // Stop silent audio if it's playing (for Android)
+      if (silentAudioRef.current) {
+        silentAudioRef.current.pause();
+      }
     };
     
     currentUtterance.current = utterance;
@@ -277,6 +317,11 @@ export default function ChapterPage() {
     if (speechSynthesis && isSpeaking && !isPaused) {
       speechSynthesis.pause();
       setIsPaused(true);
+      
+      // Pause silent audio (for Android)
+      if (silentAudioRef.current) {
+        silentAudioRef.current.pause();
+      }
     }
   };
   
@@ -284,6 +329,13 @@ export default function ChapterPage() {
     if (speechSynthesis && isSpeaking && isPaused) {
       speechSynthesis.resume();
       setIsPaused(false);
+      
+      // Resume silent audio (for Android)
+      if (isAndroid.current && silentAudioRef.current) {
+        silentAudioRef.current.play().catch(err => {
+          console.error('Failed to play silent audio:', err);
+        });
+      }
     }
   };
   
@@ -294,6 +346,11 @@ export default function ChapterPage() {
       setIsPaused(false);
       currentParagraphIndex.current = 0;
       setCurrentHighlightIndex(-1);
+      
+      // Stop silent audio if it's playing (for Android)
+      if (silentAudioRef.current) {
+        silentAudioRef.current.pause();
+      }
     }
   };
 
@@ -433,6 +490,25 @@ export default function ChapterPage() {
         <title>{novel.name} - Chapter {chapterData.chapter}: {chapterData.title} - Novel Indo</title>
         <meta name="description" content={`Read ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title}`} />
       </Head>
+
+      {/* Android Warning Toast */}
+      {showAndroidWarning && (
+        <div className="toast toast-top toast-center z-50">
+          <div className="alert alert-info">
+            <div>
+              <span>For Android: Keep screen on for uninterrupted playback</span>
+              <button 
+                className="btn btn-sm btn-circle ml-2" 
+                onClick={() => setShowAndroidWarning(false)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="fixed top-0 left-0 w-full h-1 bg-base-300 z-50">
         <div 

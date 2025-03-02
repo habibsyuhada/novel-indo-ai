@@ -229,6 +229,11 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                 <li>Lock your screen and continue listening (screen will stay awake)</li>
                 <li>Adjust voice and speed in these settings</li>
               </ul>
+              
+              <div className="mt-2 p-2 bg-info bg-opacity-20 rounded">
+                <p className="font-medium">Android Users:</p>
+                <p>For best results, keep your screen on while using text-to-speech. Android may restrict background audio in some cases.</p>
+              </div>
             </div>
           </div>
         </div>
