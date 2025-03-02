@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -256,7 +256,7 @@ export default function ChapterPage() {
   }, [currentHighlightIndex]);
 
   // Text-to-speech functions
-  const speakNextParagraph = () => {
+  const speakNextParagraph = useCallback(() => {
     // Prevent multiple simultaneous speech processes
     if (isSpeakingInProgress.current) {
       console.log('Speech already in progress, ignoring duplicate call');
@@ -364,7 +364,7 @@ export default function ChapterPage() {
     
     // Speak the current paragraph
     speechSynthesis.speak(utterance);
-  };
+  }, [isSpeaking, isPaused, selectedVoice, speechRate, showAndroidWarning, speechSynthesis]);
   
   const pauseSpeaking = () => {
     if (speechSynthesis && isSpeaking && !isPaused) {
@@ -504,7 +504,7 @@ export default function ChapterPage() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isSpeaking, isPaused]);
+  }, [isSpeaking, isPaused, speakNextParagraph, speechSynthesis]);
 
   // Fix for Chrome's bug where speech synthesis stops after ~15 seconds
   useEffect(() => {
@@ -533,7 +533,7 @@ export default function ChapterPage() {
     return () => {
       clearInterval(intervalId);
     };
-  }, [isSpeaking, isPaused]);
+  }, [isSpeaking, isPaused, speechSynthesis]);
 
   // Add a recovery mechanism for speech synthesis errors
   useEffect(() => {
@@ -564,7 +564,7 @@ export default function ChapterPage() {
     return () => {
       clearInterval(recoveryIntervalId);
     };
-  }, [isSpeaking, isPaused]);
+  }, [isSpeaking, isPaused, speakNextParagraph, speechSynthesis]);
 
   // Handle wake lock to prevent screen from turning off during speech
   useEffect(() => {
@@ -650,7 +650,7 @@ export default function ChapterPage() {
         });
       }
     };
-  }, []);
+  }, [speechSynthesis]);
 
   if (loading) {
     return (
