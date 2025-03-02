@@ -35,7 +35,7 @@ export default function NovelDetail() {
           // Fetch chapters
           const { data: chaptersData, error: chaptersError } = await supabase
             .from('novel_chapter')
-            .select('*')
+            .select('id, chapter, title')
             .eq('novel', id)
             .order('chapter', { ascending: true });
 
