@@ -1,0 +1,16 @@
+.chapterContent {
+  font-size: 1.125rem;
+  line-height: 1.8;
+}
+
+.chapterContent p {
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+@media (max-width: 768px) {
+  .chapterContent {
+    font-size: 1rem;
+    line-height: 1.7;
+  }
+} 
