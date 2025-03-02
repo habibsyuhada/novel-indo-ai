@@ -31,6 +31,23 @@ export default function ChapterPage() {
   const paragraphsRef = useRef<string[]>([]);
   const currentParagraphIndex = useRef<number>(0);
   const paragraphElementsRef = useRef<(HTMLParagraphElement | null)[]>([]);
+  const wasPlayingBeforeHidden = useRef<boolean>(false);
+  
+  // Define WakeLock types
+  type WakeLockSentinel = {
+    released: boolean;
+    release: () => Promise<void>;
+    addEventListener: (type: string, listener: EventListener) => void;
+    removeEventListener: (type: string, listener: EventListener) => void;
+  };
+  
+  type WakeLockNavigator = Navigator & {
+    wakeLock: {
+      request: (type: 'screen') => Promise<WakeLockSentinel>;
+    };
+  };
+  
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -308,6 +325,84 @@ export default function ChapterPage() {
       speakNextParagraph();
     }
   };
+
+  // Handle page visibility changes (for mobile devices when screen is locked)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // Page is hidden (screen locked or app in background)
+        wasPlayingBeforeHidden.current = isSpeaking && !isPaused;
+        
+        if (isSpeaking && !isPaused) {
+          // We need to pause speech when page is hidden
+          speechSynthesis?.pause();
+          // Note: We don't update state here because the page is hidden
+        }
+      } else if (document.visibilityState === 'visible') {
+        // Page is visible again (screen unlocked or app in foreground)
+        if (wasPlayingBeforeHidden.current) {
+          // Resume speech if it was playing before
+          speechSynthesis?.resume();
+          wasPlayingBeforeHidden.current = false;
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSpeaking, isPaused]);
+
+  // Handle wake lock to prevent screen from turning off during speech
+  useEffect(() => {
+    // Only try to get a wake lock if the feature is supported and we're speaking
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator && isSpeaking && !isPaused) {
+        try {
+          // Request a screen wake lock
+          wakeLockRef.current = await (navigator as WakeLockNavigator).wakeLock.request('screen');
+          
+          console.log('Wake Lock is active');
+          
+          // Add a listener to release the wake lock if the page becomes hidden
+          wakeLockRef.current.addEventListener('release', () => {
+            console.log('Wake Lock was released');
+          });
+        } catch (err) {
+          console.error(`Failed to get wake lock: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    };
+    
+    const releaseWakeLock = () => {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release()
+          .then(() => {
+            wakeLockRef.current = null;
+            console.log('Wake Lock released');
+          })
+          .catch((err: unknown) => {
+            console.error(`Failed to release wake lock: ${err instanceof Error ? err.message : String(err)}`);
+          });
+      }
+    };
+    
+    if (isSpeaking && !isPaused) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+    
+    // Clean up on unmount
+    return () => {
+      releaseWakeLock();
+    };
+  }, [isSpeaking, isPaused]);
 
   if (loading) {
     return (

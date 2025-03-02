@@ -226,6 +226,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                 <li>Stop reading to reset to the beginning</li>
                 <li>See highlighted text that&apos;s currently being read</li>
                 <li>Click any paragraph to start reading from that point</li>
+                <li>Lock your screen and continue listening (screen will stay awake)</li>
                 <li>Adjust voice and speed in these settings</li>
               </ul>
             </div>

@@ -16,6 +16,8 @@ A modern web application for reading novels online, built with Next.js, DaisyUI,
 - Text-to-speech functionality with pause/resume capability
 - Visual text highlighting of currently spoken paragraph (without padding)
 - Click-to-read functionality for starting speech from any paragraph
+- Background audio playback when screen is locked
+- Wake lock to prevent screen timeout during playback
 - Customizable speech rate and voice selection (saved to localStorage)
 - Responsive design for all devices
 - Keyboard navigation support
@@ -37,6 +39,7 @@ The application includes a centralized settings panel accessible from any page:
   - Pause/resume controls while reading
   - Visual text highlighting for better focus
   - Click-to-read from any paragraph
+  - Background playback with screen lock support
 
 All user settings are automatically saved to localStorage, ensuring preferences persist between sessions.
 
@@ -79,6 +82,7 @@ The application is fully optimized for mobile devices:
 - Text-to-speech functionality with pause/resume controls
 - Visual highlighting of currently spoken text
 - Click-to-read from any paragraph
+- Background audio playback with screen lock support
 - Adjustable font sizes
 - High contrast mode (via theme toggle)
 
