@@ -3,14 +3,21 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
-import { supabase, Novel, NovelChapter } from '../../lib/supabase';
+import { supabase, Novel } from '../../lib/supabase';
+
+// Buat tipe baru untuk daftar chapter yang tidak memerlukan semua properti NovelChapter
+type ChapterListItem = {
+  id: number;
+  chapter: number;
+  title: string;
+};
 
 export default function NovelDetail() {
   const router = useRouter();
   const { id } = router.query;
   
   const [novel, setNovel] = useState<Novel | null>(null);
-  const [chapters, setChapters] = useState<NovelChapter[]>([]);
+  const [chapters, setChapters] = useState<ChapterListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,7 +49,7 @@ export default function NovelDetail() {
           if (chaptersError) throw chaptersError;
           
           if (chaptersData) {
-            setChapters(chaptersData);
+            setChapters(chaptersData as ChapterListItem[]);
           }
         }
       } catch (error) {
