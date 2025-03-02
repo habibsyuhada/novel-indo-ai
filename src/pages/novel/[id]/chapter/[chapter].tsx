@@ -36,6 +36,12 @@ export default function ChapterPage() {
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
   const isAndroid = useRef<boolean>(false);
   
+  // Web Audio API references
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const [hasAudioPermission, setHasAudioPermission] = useState(false);
+  const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+  
   // Define WakeLock types
   type WakeLockSentinel = {
     released: boolean;
@@ -53,6 +59,7 @@ export default function ChapterPage() {
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   const [isMobile, setIsMobile] = useState(false);
+  const [isRunningInBackground, setIsRunningInBackground] = useState(false);
 
   // Check if device is mobile and detect Android
   useEffect(() => {
@@ -74,11 +81,57 @@ export default function ChapterPage() {
       }
     }
     
+    // Initialize Web Audio Context
+    if (typeof window !== 'undefined') {
+      try {
+        // Create AudioContext with proper typing
+        const AudioContextClass = window.AudioContext || 
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        audioContextRef.current = new AudioContextClass();
+      } catch (e) {
+        console.error('Web Audio API is not supported in this browser', e);
+      }
+    }
+    
     checkMobile();
     window.addEventListener('resize', checkMobile);
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Request audio permission
+  const requestAudioPermission = async () => {
+    try {
+      // Request microphone permission to keep audio context running
+      // We don't actually use the microphone, but this keeps the audio context active
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      if (audioContextRef.current) {
+        // Connect the stream to the audio context to keep it active
+        audioSourceRef.current = audioContextRef.current.createMediaStreamSource(stream);
+        // Connect to a silent destination to avoid feedback
+        audioSourceRef.current.connect(audioContextRef.current.createGain());
+        
+        setHasAudioPermission(true);
+        setShowPermissionPrompt(false);
+        
+        // Request notification permission if not already granted
+        if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+          try {
+            await Notification.requestPermission();
+          } catch (err) {
+            console.error('Failed to request notification permission:', err);
+          }
+        }
+      }
+      
+      return true;
+    } catch (err) {
+      console.error('Error requesting audio permission:', err);
+      setHasAudioPermission(false);
+      return false;
+    }
+  };
 
   // Load saved settings from localStorage
   useEffect(() => {
@@ -252,7 +305,168 @@ export default function ChapterPage() {
     }
   }, [currentHighlightIndex]);
 
-  // Text-to-speech functions
+  // Handle page visibility changes (for mobile devices when screen is locked)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // Page is hidden (screen locked or app in background)
+        wasPlayingBeforeHidden.current = isSpeaking && !isPaused;
+        
+        if (isSpeaking && !isPaused) {
+          if (hasAudioPermission) {
+            // If we have audio permission, we can keep the speech running
+            // We don't need to pause it
+            setIsRunningInBackground(true);
+            
+            // Keep audio context running
+            if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+              audioContextRef.current.resume().catch(err => {
+                console.error('Failed to resume audio context:', err);
+              });
+            }
+            
+            // Show notification that TTS is running in background (if supported)
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                // new Notification('Novel Indo - Text-to-Speech', {
+                //   body: `Still reading ${novel?.name || 'your novel'} in the background`,
+                //   icon: '/favicon.ico',
+                //   silent: true
+                // });
+              } catch (err) {
+                console.error('Failed to show notification:', err);
+              }
+            }
+          } else {
+            // Without audio permission, we still need to pause speech when page is hidden
+            speechSynthesis?.pause();
+            // Show permission prompt when they return
+            setShowPermissionPrompt(true);
+          }
+        }
+      } else if (document.visibilityState === 'visible') {
+        // Page is visible again (screen unlocked or app in foreground)
+        setIsRunningInBackground(false);
+        
+        if (wasPlayingBeforeHidden.current) {
+          // Resume speech if it was playing before
+          if (!hasAudioPermission) {
+            speechSynthesis?.resume();
+          }
+          wasPlayingBeforeHidden.current = false;
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSpeaking, isPaused, hasAudioPermission, novel?.name]);
+
+  // Keep audio context running
+  useEffect(() => {
+    if (!audioContextRef.current || !hasAudioPermission) return;
+    
+    const keepAudioAlive = () => {
+      if (isSpeaking && !isPaused && audioContextRef.current) {
+        // Create and play a silent oscillator to keep the audio context active
+        const oscillator = audioContextRef.current.createOscillator();
+        const gainNode = audioContextRef.current.createGain();
+        
+        // Set the gain to 0 (silent)
+        gainNode.gain.value = 0;
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContextRef.current.destination);
+        
+        oscillator.start();
+        oscillator.stop(audioContextRef.current.currentTime + 0.1);
+      }
+    };
+    
+    // Run the keepAudioAlive function every 10 seconds
+    const interval = setInterval(keepAudioAlive, 10000);
+    
+    // Register a service worker to keep the audio context alive
+    if ('serviceWorker' in navigator && isSpeaking && !isPaused) {
+      // Check if we already have a service worker
+      navigator.serviceWorker.getRegistration('/audio-sw.js')
+        .then(registration => {
+          if (!registration) {
+            // Register a new service worker
+            navigator.serviceWorker.register('/audio-sw.js')
+              .then(reg => {
+                console.log('Audio service worker registered:', reg);
+                
+                // Send a message to start keep-alive
+                if (reg.active) {
+                  reg.active.postMessage({ type: 'START_KEEP_ALIVE' });
+                }
+              })
+              .catch(err => {
+                console.error('Audio service worker registration failed:', err);
+              });
+          } else if (registration.active) {
+            // Service worker already registered, send keep-alive message
+            registration.active.postMessage({ type: 'START_KEEP_ALIVE' });
+          }
+        });
+      
+      // Set up message listener for service worker
+      const messageListener = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'STILL_ALIVE') {
+          // Service worker is still alive, we can use this to keep our audio context active
+          if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+            audioContextRef.current.resume().catch(err => {
+              console.error('Failed to resume audio context:', err);
+            });
+          }
+        }
+      };
+      
+      navigator.serviceWorker.addEventListener('message', messageListener);
+      
+      // Clean up
+      return () => {
+        clearInterval(interval);
+        navigator.serviceWorker.removeEventListener('message', messageListener);
+        
+        // Tell service worker to stop keep-alive if we're no longer speaking
+        navigator.serviceWorker.getRegistration('/audio-sw.js')
+          .then(registration => {
+            if (registration && registration.active) {
+              registration.active.postMessage({ type: 'STOP_KEEP_ALIVE' });
+            }
+          });
+      };
+    }
+    
+    return () => clearInterval(interval);
+  }, [isSpeaking, isPaused, hasAudioPermission]);
+
+  // Clean up service worker when component unmounts
+  useEffect(() => {
+    return () => {
+      if ('serviceWorker' in navigator && !isSpeaking) {
+        navigator.serviceWorker.getRegistration('/audio-sw.js')
+          .then(registration => {
+            if (registration) {
+              // Only unregister if we're not speaking
+              registration.unregister()
+                .then(() => console.log('Audio service worker unregistered'))
+                .catch(err => console.error('Failed to unregister audio service worker:', err));
+            }
+          });
+      }
+    };
+  }, [isSpeaking]);
+
+  // Modify speakNextParagraph to use audio context
   const speakNextParagraph = () => {
     if (!speechSynthesis || currentParagraphIndex.current >= paragraphsRef.current.length) {
       setIsSpeaking(false);
@@ -268,67 +482,171 @@ export default function ChapterPage() {
       return;
     }
     
-    const utterance = new SpeechSynthesisUtterance(paragraphsRef.current[currentParagraphIndex.current]);
-    
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
+    // Resume audio context if it's suspended
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(err => {
+        console.error('Failed to resume audio context:', err);
+      });
     }
     
-    utterance.rate = speechRate;
+    // Get the current paragraph text
+    const paragraphText = paragraphsRef.current[currentParagraphIndex.current];
     
-    utterance.onstart = () => {
-      setCurrentHighlightIndex(currentParagraphIndex.current);
+    // Split long paragraphs into smaller chunks at sentence boundaries
+    // This helps with browser limitations on utterance length
+    const maxChunkLength = 150; // Characters per chunk
+    let chunks: string[] = [];
+    
+    if (paragraphText.length > maxChunkLength) {
+      // Split by sentence endings (., !, ?) followed by a space or end of string
+      const sentences = paragraphText.match(/[^.!?]+[.!?](\s|$)/g) || [];
       
-      // Start playing silent audio to keep process alive on Android
-      if (isAndroid.current && silentAudioRef.current) {
-        silentAudioRef.current.play().catch(err => {
-          console.error('Failed to play silent audio:', err);
+      if (sentences.length > 0) {
+        let currentChunk = '';
+        
+        // Group sentences into chunks of appropriate size
+        sentences.forEach(sentence => {
+          if (currentChunk.length + sentence.length <= maxChunkLength) {
+            currentChunk += sentence;
+          } else {
+            if (currentChunk) {
+              chunks.push(currentChunk.trim());
+            }
+            currentChunk = sentence;
+          }
         });
         
-        // Show Android warning once
-        if (!showAndroidWarning) {
-          setShowAndroidWarning(true);
+        // Add the last chunk if it exists
+        if (currentChunk) {
+          chunks.push(currentChunk.trim());
+        }
+      } else {
+        // If we can't split by sentences, split by character count
+        for (let i = 0; i < paragraphText.length; i += maxChunkLength) {
+          chunks.push(paragraphText.substring(i, Math.min(i + maxChunkLength, paragraphText.length)));
         }
       }
-    };
+    } else {
+      // Short paragraph, no need to split
+      chunks = [paragraphText];
+    }
     
-    utterance.onend = () => {
-      currentParagraphIndex.current += 1;
-      speakNextParagraph();
-    };
-    
-    utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event);
-      setIsSpeaking(false);
-      setIsPaused(false);
-      setCurrentHighlightIndex(-1);
-      
-      // Stop silent audio if it's playing (for Android)
-      if (silentAudioRef.current) {
-        silentAudioRef.current.pause();
+    // Function to speak each chunk sequentially
+    const speakChunks = (chunkIndex = 0) => {
+      if (chunkIndex >= chunks.length) {
+        // Move to the next paragraph when all chunks are spoken
+        currentParagraphIndex.current += 1;
+        speakNextParagraph();
+        return;
       }
+      
+      const utterance = new SpeechSynthesisUtterance(chunks[chunkIndex]);
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      
+      utterance.rate = speechRate;
+      
+      // Only show highlight and play silent audio for the first chunk
+      if (chunkIndex === 0) {
+        utterance.onstart = () => {
+          setCurrentHighlightIndex(currentParagraphIndex.current);
+          
+          // Start playing silent audio to keep process alive on Android
+          if (isAndroid.current && silentAudioRef.current) {
+            silentAudioRef.current.play().catch(err => {
+              console.error('Failed to play silent audio:', err);
+            });
+            
+            // Show Android warning once
+            if (!showAndroidWarning) {
+              setShowAndroidWarning(true);
+            }
+          }
+        };
+      }
+      
+      utterance.onend = () => {
+        // Speak the next chunk
+        speakChunks(chunkIndex + 1);
+      };
+      
+      utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event);
+        
+        // If one chunk fails, try the next one
+        if (chunkIndex < chunks.length - 1) {
+          speakChunks(chunkIndex + 1);
+        } else {
+          setIsSpeaking(false);
+          setIsPaused(false);
+          setCurrentHighlightIndex(-1);
+          
+          // Stop silent audio if it's playing (for Android)
+          if (silentAudioRef.current) {
+            silentAudioRef.current.pause();
+          }
+        }
+      };
+      
+      currentUtterance.current = utterance;
+      speechSynthesis.speak(utterance);
     };
     
-    currentUtterance.current = utterance;
-    speechSynthesis.speak(utterance);
+    // Start speaking the chunks
+    speakChunks();
   };
   
   const pauseSpeaking = () => {
     if (speechSynthesis && isSpeaking && !isPaused) {
-      speechSynthesis.pause();
+      // Cancel any pending utterances to prevent them from playing after resuming
+      speechSynthesis.cancel();
+      
+      // Store the current state so we can resume from this point
+      const currentState = {
+        paragraphIndex: currentParagraphIndex.current,
+        highlightIndex: currentHighlightIndex
+      };
+      
+      // We'll use this stored state when resuming
+      currentUtterance.current = null;
+      
       setIsPaused(true);
       
       // Pause silent audio (for Android)
       if (silentAudioRef.current) {
         silentAudioRef.current.pause();
       }
+      
+      // Store the current state in a ref or localStorage if needed
+      // This is useful for resuming from the exact same position
+      localStorage.setItem('pausedAt', JSON.stringify(currentState));
     }
   };
   
   const resumeSpeaking = () => {
     if (speechSynthesis && isSpeaking && isPaused) {
-      speechSynthesis.resume();
+      // Get the stored state
+      let resumeState;
+      try {
+        const storedState = localStorage.getItem('pausedAt');
+        if (storedState) {
+          resumeState = JSON.parse(storedState);
+        }
+      } catch (e) {
+        console.error('Failed to parse stored state:', e);
+      }
+      
+      // If we have a stored state, use it
+      if (resumeState) {
+        currentParagraphIndex.current = resumeState.paragraphIndex;
+        setCurrentHighlightIndex(resumeState.highlightIndex);
+      }
+      
+      // Resume speaking from the current paragraph
       setIsPaused(false);
+      speakNextParagraph();
       
       // Resume silent audio (for Android)
       if (isAndroid.current && silentAudioRef.current) {
@@ -336,20 +654,47 @@ export default function ChapterPage() {
           console.error('Failed to play silent audio:', err);
         });
       }
+      
+      // Resume audio context if it's suspended
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(err => {
+          console.error('Failed to resume audio context:', err);
+        });
+      }
     }
   };
   
   const stopSpeaking = () => {
     if (speechSynthesis) {
+      // Cancel all pending utterances
       speechSynthesis.cancel();
+      
+      // Reset all speech-related state
       setIsSpeaking(false);
       setIsPaused(false);
       currentParagraphIndex.current = 0;
       setCurrentHighlightIndex(-1);
+      currentUtterance.current = null;
+      
+      // Clear any stored pause state
+      localStorage.removeItem('pausedAt');
       
       // Stop silent audio if it's playing (for Android)
       if (silentAudioRef.current) {
         silentAudioRef.current.pause();
+      }
+      
+      // If we have a service worker, tell it to stop keep-alive
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration('/audio-sw.js')
+          .then(registration => {
+            if (registration && registration.active) {
+              registration.active.postMessage({ type: 'STOP_KEEP_ALIVE' });
+            }
+          })
+          .catch(err => {
+            console.error('Failed to communicate with service worker:', err);
+          });
       }
     }
   };
@@ -358,9 +703,15 @@ export default function ChapterPage() {
   const setParagraphRef = (element: HTMLParagraphElement | null, index: number) => {
     paragraphElementsRef.current[index] = element;
   };
-
+  
   // Handle paragraph click to start reading from that paragraph
   const handleParagraphClick = (index: number) => {
+    // Check for audio permission first if not already granted
+    if (!hasAudioPermission && !showPermissionPrompt) {
+      setShowPermissionPrompt(true);
+      return;
+    }
+    
     // If already speaking, stop first
     if (isSpeaking) {
       stopSpeaking();
@@ -382,38 +733,6 @@ export default function ChapterPage() {
       speakNextParagraph();
     }
   };
-
-  // Handle page visibility changes (for mobile devices when screen is locked)
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        // Page is hidden (screen locked or app in background)
-        wasPlayingBeforeHidden.current = isSpeaking && !isPaused;
-        
-        if (isSpeaking && !isPaused) {
-          // We need to pause speech when page is hidden
-          speechSynthesis?.pause();
-          // Note: We don't update state here because the page is hidden
-        }
-      } else if (document.visibilityState === 'visible') {
-        // Page is visible again (screen unlocked or app in foreground)
-        if (wasPlayingBeforeHidden.current) {
-          // Resume speech if it was playing before
-          speechSynthesis?.resume();
-          wasPlayingBeforeHidden.current = false;
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSpeaking, isPaused]);
 
   // Handle wake lock to prevent screen from turning off during speech
   useEffect(() => {
@@ -491,6 +810,44 @@ export default function ChapterPage() {
         <meta name="description" content={`Read ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title}`} />
       </Head>
 
+      {/* Permission Request Modal */}
+      {showPermissionPrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-base-100 p-6 rounded-lg shadow-xl max-w-md w-full">
+            <h3 className="font-bold text-lg mb-4">Enable Background Audio</h3>
+            <p className="mb-4">
+              To keep the text-to-speech running when your screen is locked or when you switch tabs, 
+              we need permission to use audio in the background.
+            </p>
+            <p className="mb-6 text-sm opacity-75">
+              Note: We don&apos;t actually record any audio, this permission just keeps the audio system active.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button 
+                className="btn btn-outline" 
+                onClick={() => setShowPermissionPrompt(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={async () => {
+                  const granted = await requestAudioPermission();
+                  if (granted) {
+                    // If permission was granted and we were trying to start reading
+                    if (currentHighlightIndex >= 0) {
+                      handleParagraphClick(currentHighlightIndex);
+                    }
+                  }
+                }}
+              >
+                Allow
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Android Warning Toast */}
       {showAndroidWarning && (
         <div className="toast toast-top toast-center z-50">
@@ -506,6 +863,18 @@ export default function ChapterPage() {
                 </svg>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Background Reading Indicator */}
+      {isRunningInBackground && (
+        <div className="fixed bottom-4 right-4 bg-primary text-primary-content p-2 rounded-lg shadow-lg z-50 animate-pulse">
+          <div className="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+            </svg>
+            <span>Reading in background</span>
           </div>
         </div>
       )}
