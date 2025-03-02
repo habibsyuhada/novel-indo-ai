@@ -37,6 +37,9 @@ export default function ChapterPage() {
   const isAndroid = useRef<boolean>(false);
   const isIOS = useRef<boolean>(false);
   const isSpeakingInProgress = useRef<boolean>(false);
+  const lastSpeechTimestamp = useRef<number>(0);
+  const utteranceQueue = useRef<SpeechSynthesisUtterance[]>([]);
+  const isChrome = useRef<boolean>(false);
   
   // Define WakeLock types
   type WakeLockSentinel = {
@@ -66,6 +69,7 @@ export default function ChapterPage() {
     if (typeof navigator !== 'undefined') {
       isAndroid.current = /android/i.test(navigator.userAgent);
       isIOS.current = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      isChrome.current = /chrome/i.test(navigator.userAgent);
       
       // Create silent audio element for Android
       if (isAndroid.current) {
@@ -209,10 +213,42 @@ export default function ChapterPage() {
       }
     };
     
+    // Optimize speech synthesis performance
+    const optimizeSpeechSynthesis = () => {
+      if (!speechSynthesis) return;
+      
+      // Some browsers have performance issues with speech synthesis
+      // This function attempts to optimize it
+      
+      // Add a periodic check to ensure speech synthesis is working
+      const checkInterval = setInterval(() => {
+        if (isSpeaking && !isPaused && !speechSynthesis.speaking && !speechSynthesis.pending) {
+          // If we're supposed to be speaking but nothing is happening,
+          // the speech synthesis might be in a bad state
+          console.log('Speech synthesis in bad state, resetting...');
+          speechSynthesis.cancel();
+        }
+      }, 30000);
+      
+      // Return cleanup function
+      return () => {
+        clearInterval(checkInterval);
+      };
+    };
+    
     // Chrome loads voices asynchronously
     if (speechSynthesis) {
       speechSynthesis.onvoiceschanged = loadVoices;
       loadVoices(); // For Firefox
+      
+      // Apply optimizations
+      const cleanupOptimizations = optimizeSpeechSynthesis();
+      
+      // Cleanup
+      return () => {
+        stopSpeaking();
+        if (cleanupOptimizations) cleanupOptimizations();
+      };
     }
     
     // Cleanup
@@ -280,90 +316,108 @@ export default function ChapterPage() {
     }
     
     isSpeakingInProgress.current = true;
+    lastSpeechTimestamp.current = Date.now();
     
-    const utterance = new SpeechSynthesisUtterance(paragraphsRef.current[currentParagraphIndex.current]);
+    // Pre-buffer a few paragraphs for smoother playback
+    const maxBufferSize = 2; // Buffer up to 2 paragraphs ahead
+    utteranceQueue.current = [];
     
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
+    // Create utterances for current and next paragraphs (if available)
+    for (let i = 0; i < maxBufferSize && (currentParagraphIndex.current + i) < paragraphsRef.current.length; i++) {
+      const paragraphIndex = currentParagraphIndex.current + i;
+      const utterance = new SpeechSynthesisUtterance(paragraphsRef.current[paragraphIndex]);
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      
+      utterance.rate = speechRate;
+      
+      // Only set event handlers for the current paragraph
+      if (i === 0) {
+        utterance.onstart = () => {
+          setCurrentHighlightIndex(currentParagraphIndex.current);
+          
+          // Start playing silent audio to keep process alive on Android
+          if (isAndroid.current && silentAudioRef.current) {
+            silentAudioRef.current.play().catch(err => {
+              console.error('Failed to play silent audio:', err);
+            });
+            
+            // Show Android warning once
+            if (!showAndroidWarning) {
+              setShowAndroidWarning(true);
+            }
+          }
+        };
+        
+        utterance.onend = () => {
+          // Release the lock to allow next paragraph to be spoken
+          isSpeakingInProgress.current = false;
+          lastSpeechTimestamp.current = Date.now();
+          
+          // Only proceed if we're still in speaking mode
+          if (isSpeaking && !isPaused) {
+            currentParagraphIndex.current += 1;
+            
+            // Check if we've reached the end before calling speakNextParagraph
+            if (currentParagraphIndex.current < paragraphsRef.current.length) {
+              // Small delay to prevent potential race conditions
+              setTimeout(() => {
+                speakNextParagraph();
+              }, 50);
+            } else {
+              // We've reached the end, stop speaking
+              setIsSpeaking(false);
+              setIsPaused(false);
+              setCurrentHighlightIndex(-1);
+              
+              // Stop silent audio if it's playing (for Android)
+              if (silentAudioRef.current) {
+                silentAudioRef.current.pause();
+              }
+            }
+          }
+        };
+        
+        utterance.onerror = (event) => {
+          console.error('Speech synthesis error:', event);
+          
+          // Release the lock on error
+          isSpeakingInProgress.current = false;
+          
+          // If the error is not due to cancellation, try to recover
+          if (event.error !== 'canceled' && isSpeaking && !isPaused) {
+            console.log('Attempting to recover from speech error');
+            setTimeout(() => {
+              speakNextParagraph();
+            }, 1000);
+          } else {
+            setIsSpeaking(false);
+            setIsPaused(false);
+            setCurrentHighlightIndex(-1);
+            
+            // Stop silent audio if it's playing (for Android)
+            if (silentAudioRef.current) {
+              silentAudioRef.current.pause();
+            }
+          }
+        };
+      }
+      
+      utteranceQueue.current.push(utterance);
     }
     
-    utterance.rate = speechRate;
-    
-    utterance.onstart = () => {
-      setCurrentHighlightIndex(currentParagraphIndex.current);
-      
-      // Start playing silent audio to keep process alive on Android
-      if (isAndroid.current && silentAudioRef.current) {
-        silentAudioRef.current.play().catch(err => {
-          console.error('Failed to play silent audio:', err);
-        });
-        
-        // Show Android warning once
-        if (!showAndroidWarning) {
-          setShowAndroidWarning(true);
-        }
-      }
-    };
-    
-    utterance.onend = () => {
-      // Release the lock to allow next paragraph to be spoken
-      isSpeakingInProgress.current = false;
-      
-      // Only proceed if we're still in speaking mode
-      if (isSpeaking && !isPaused) {
-        currentParagraphIndex.current += 1;
-        
-        // Check if we've reached the end before calling speakNextParagraph
-        if (currentParagraphIndex.current < paragraphsRef.current.length) {
-          // Small delay to prevent potential race conditions
-          setTimeout(() => {
-            speakNextParagraph();
-          }, 50);
-        } else {
-          // We've reached the end, stop speaking
-          setIsSpeaking(false);
-          setIsPaused(false);
-          setCurrentHighlightIndex(-1);
-          
-          // Stop silent audio if it's playing (for Android)
-          if (silentAudioRef.current) {
-            silentAudioRef.current.pause();
-          }
-        }
-      }
-    };
-    
-    utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event);
-      
-      // Release the lock on error
-      isSpeakingInProgress.current = false;
-      
-      // If the error is not due to cancellation, try to recover
-      if (event.error !== 'canceled' && isSpeaking && !isPaused) {
-        console.log('Attempting to recover from speech error');
-        setTimeout(() => {
-          speakNextParagraph();
-        }, 1000);
-      } else {
-        setIsSpeaking(false);
-        setIsPaused(false);
-        setCurrentHighlightIndex(-1);
-        
-        // Stop silent audio if it's playing (for Android)
-        if (silentAudioRef.current) {
-          silentAudioRef.current.pause();
-        }
-      }
-    };
-    
-    currentUtterance.current = utterance;
+    // Store the current utterance for reference
+    currentUtterance.current = utteranceQueue.current[0];
     
     // Clear any existing speech queue to prevent duplicates
     speechSynthesis.cancel();
     
-    // Speak the current paragraph
-    speechSynthesis.speak(utterance);
+    // Speak all buffered paragraphs
+    utteranceQueue.current.forEach(utterance => {
+      speechSynthesis.speak(utterance);
+    });
   }, [isSpeaking, isPaused, selectedVoice, speechRate, showAndroidWarning, speechSynthesis]);
   
   const pauseSpeaking = () => {
@@ -464,6 +518,10 @@ export default function ChapterPage() {
               // Reset the in-progress flag
               isSpeakingInProgress.current = false;
             }
+          } else if (isChrome.current) {
+            // Chrome sometimes has issues with background tabs
+            // We'll just let it continue and rely on our recovery mechanisms
+            console.log('Chrome tab hidden, monitoring for speech issues');
           } else {
             // For other devices, we'll handle it when the page becomes visible again
             // We don't actually pause the speech here to allow it to continue in background
@@ -472,6 +530,9 @@ export default function ChapterPage() {
       } else if (document.visibilityState === 'visible') {
         // Page is visible again (screen unlocked or app in foreground)
         if (wasPlayingBeforeHidden.current) {
+          // Update the timestamp to prevent immediate recovery attempts
+          lastSpeechTimestamp.current = Date.now();
+          
           // Only try to resume if we haven't reached the end and we're not already speaking
           if (currentParagraphIndex.current < paragraphsRef.current.length && !isSpeakingInProgress.current) {
             // Check if speech synthesis is in a paused state
@@ -482,10 +543,11 @@ export default function ChapterPage() {
               // For iOS, we always need to restart
               // Add a small delay to ensure everything is ready
               setTimeout(() => {
-                if (!isSpeakingInProgress.current) {
+                if (!isSpeakingInProgress.current && isSpeaking && !isPaused) {
+                  console.log('Resuming speech after visibility change');
                   speakNextParagraph();
                 }
-              }, 300);
+              }, 500);
             }
           } else {
             // We've reached the end or speech is already in progress, don't try to resume
@@ -508,19 +570,25 @@ export default function ChapterPage() {
 
   // Fix for Chrome's bug where speech synthesis stops after ~15 seconds
   useEffect(() => {
-    if (!isSpeaking || isPaused || typeof window === 'undefined') return;
+    if (!isSpeaking || isPaused || typeof window === 'undefined' || !isChrome.current) return;
     
     // Chrome has a bug where it stops speech synthesis after ~15 seconds
     // This is a workaround to keep it going
     const handleChromeBug = () => {
-      if (speechSynthesis && isSpeaking && !isPaused && speechSynthesis.speaking) {
-        // Only apply the fix if speech is actually in progress
+      // Only apply the fix if speech is actually in progress and it's been more than 10 seconds since last speech
+      const timeSinceLastSpeech = Date.now() - lastSpeechTimestamp.current;
+      
+      if (speechSynthesis && isSpeaking && !isPaused && 
+          speechSynthesis.speaking && 
+          timeSinceLastSpeech > 10000) {
+        console.log('Applying Chrome speech synthesis fix');
         // This is a workaround for Chrome's bug
         // We need to pause and resume to keep it going
         speechSynthesis.pause();
         setTimeout(() => {
           if (isSpeaking && !isPaused) {
             speechSynthesis.resume();
+            lastSpeechTimestamp.current = Date.now();
           }
         }, 50);
       }
@@ -544,10 +612,14 @@ export default function ChapterPage() {
     const recoverySafetyCheck = () => {
       // Only attempt recovery if we're supposed to be speaking but nothing is happening
       // and we're not already in the process of speaking
+      // and it's been more than 15 seconds since the last speech event
+      const timeSinceLastSpeech = Date.now() - lastSpeechTimestamp.current;
+      
       if (isSpeaking && !isPaused && speechSynthesis && 
           !speechSynthesis.speaking && 
           !isSpeakingInProgress.current &&
-          currentParagraphIndex.current < paragraphsRef.current.length) {
+          currentParagraphIndex.current < paragraphsRef.current.length &&
+          timeSinceLastSpeech > 15000) {
         console.log('Speech synthesis recovery: Detected speech stopped unexpectedly, restarting');
         // Add a small delay before restarting to prevent race conditions
         setTimeout(() => {
@@ -559,7 +631,7 @@ export default function ChapterPage() {
     };
     
     // Increased interval to reduce potential for issues
-    const recoveryIntervalId = setInterval(recoverySafetyCheck, 10000);
+    const recoveryIntervalId = setInterval(recoverySafetyCheck, 20000);
     
     return () => {
       clearInterval(recoveryIntervalId);
@@ -652,6 +724,50 @@ export default function ChapterPage() {
     };
   }, [speechSynthesis]);
 
+  // Render chapter content with proper paragraph formatting
+  const renderChapterContent = () => {
+    if (!chapterData || !novel) return null;
+    
+    // Split text into paragraphs
+    const paragraphs = chapterData.text.split('\n').filter(p => p.trim() !== '');
+    
+    return (
+      <div 
+        className={styles.chapterContent} 
+        style={{ fontSize: `${fontSize}px` }}
+        // Add article role to indicate this is readable content
+        role="article"
+        // Add aria-label to improve accessibility
+        aria-label={`${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title}`}
+        // Add lang attribute to help with text-to-speech
+        lang="id"
+        // Add itemprop for better structured data
+        itemScope
+        itemType="https://schema.org/Article"
+      >
+        <meta itemProp="headline" content={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title}`} />
+        <meta itemProp="author" content={novel.author || 'Novel Indo'} />
+        
+        {paragraphs.map((paragraph, index) => (
+          <p 
+            key={index} 
+            ref={(element) => setParagraphRef(element, index)}
+            className={`mb-4 ${currentHighlightIndex === index ? styles.highlighted : ''}`}
+            onClick={() => handleParagraphClick(index)}
+            // Add tabIndex to make paragraphs focusable
+            tabIndex={0}
+            // Add aria attributes for better accessibility
+            aria-current={currentHighlightIndex === index ? "true" : "false"}
+            // Add itemprop for better structured data
+            itemProp="text"
+          >
+            {paragraph}
+          </p>
+        ))}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -680,6 +796,10 @@ export default function ChapterPage() {
       <Head>
         <title>{novel.name} - Chapter {chapterData.chapter}: {chapterData.title} - Novel Indo</title>
         <meta name="description" content={`Read ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title}`} />
+        {/* Add metadata to help Chrome detect readable content */}
+        <meta name="article:section" content="Novel Chapter" />
+        <meta name="article:tag" content={`${novel.name}, Chapter ${chapterData.chapter}, ${novel.genre || 'Novel'}`} />
+        <meta property="og:type" content="article" />
       </Head>
 
       {/* Android Warning Toast */}
@@ -722,8 +842,9 @@ export default function ChapterPage() {
 
       <div className="card bg-base-100 shadow-xl mb-4 md:mb-6">
         <div className="card-body p-3 md:p-6">
-          <h1 className="card-title text-xl md:text-2xl">{novel.name}</h1>
-          <h2 className="text-lg md:text-xl">Chapter {chapterData.chapter}: {chapterData.title}</h2>
+          <h1 className="card-title text-xl md:text-2xl mb-2">
+            Chapter {chapterData.chapter}: {chapterData.title}
+          </h1>
           
           <div className="mt-3 md:mt-4">
             <div className="flex flex-wrap gap-2 md:gap-4 items-center">
@@ -775,6 +896,22 @@ export default function ChapterPage() {
               )}
             </div>
           </div>
+          
+          <div className="divider my-2"></div>
+          
+          {/* Add main content landmark for better accessibility */}
+          <main 
+            id="chapter-content" 
+            ref={contentRef}
+            // Add article role to indicate this is readable content
+            role="main"
+            // Add aria-label to improve accessibility
+            aria-label="Chapter content"
+            // Add lang attribute to help with text-to-speech
+            lang="id"
+          >
+            {renderChapterContent()}
+          </main>
         </div>
       </div>
 
@@ -834,85 +971,34 @@ export default function ChapterPage() {
         )}
       </div>
 
-      <div className="card bg-base-100 shadow-xl mb-4 md:mb-6" ref={contentRef}>
-        <div className="card-body p-3 md:p-6">
-          <div className="prose max-w-none">
-            <div 
-              className={styles.chapterContent} 
-              style={{ fontSize: `${fontSize}px` }}
-            >
-              {chapterData.text.split('\n').filter(paragraph => paragraph.trim() !== '').map((paragraph, index) => (
-                <p 
-                  key={index} 
-                  ref={(el) => setParagraphRef(el, index)}
-                  className={currentHighlightIndex === index ? 'bg-primary bg-opacity-20 rounded transition-all duration-300' : ''}
-                  onClick={() => handleParagraphClick(index)}
-                  style={{ cursor: 'pointer' }}
-                  title="Click to read from this paragraph"
-                >
-                  {paragraph}
-                </p>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-between mb-4 md:mb-6">
-        {prevChapter ? (
-          <Link href={`/novel/${novel.id}/chapter/${prevChapter}`} className="btn btn-outline btn-sm md:btn-md">
-            {isMobile ? (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-            ) : (
-              "← Previous Chapter"
-            )}
-          </Link>
-        ) : (
-          <button className="btn btn-outline btn-sm md:btn-md" disabled>
-            {isMobile ? (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-            ) : (
-              "← Previous Chapter"
-            )}
-          </button>
-        )}
-        
-        <Link href={`/novel/${novel.id}`} className="btn btn-primary btn-sm md:btn-md">
-          {isMobile ? (
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-            </svg>
-          ) : (
-            "Chapter List"
-          )}
-        </Link>
-        
-        {nextChapter ? (
-          <Link href={`/novel/${novel.id}/chapter/${nextChapter}`} className="btn btn-outline btn-sm md:btn-md">
-            {isMobile ? (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
-            ) : (
-              "Next Chapter →"
-            )}
-          </Link>
-        ) : (
-          <button className="btn btn-outline btn-sm md:btn-md" disabled>
-            {isMobile ? (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
-            ) : (
-              "Next Chapter →"
-            )}
-          </button>
-        )}
-      </div>
+      {/* Add structured data for better content detection */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Article',
+            'headline': `${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title}`,
+            'author': {
+              '@type': 'Person',
+              'name': novel.author || 'Novel Indo'
+            },
+            'publisher': {
+              '@type': 'Organization',
+              'name': 'Novel Indo',
+              'logo': {
+                '@type': 'ImageObject',
+                'url': typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : ''
+              }
+            },
+            'mainEntityOfPage': {
+              '@type': 'WebPage',
+              '@id': typeof window !== 'undefined' ? `${window.location.href}` : ''
+            },
+            'articleBody': chapterData.text
+          })
+        }}
+      />
     </Layout>
   );
 }
