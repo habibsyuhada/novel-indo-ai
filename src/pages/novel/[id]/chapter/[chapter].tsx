@@ -36,6 +36,7 @@ export default function ChapterPage() {
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
   const isAndroid = useRef<boolean>(false);
   const isIOS = useRef<boolean>(false);
+  const isSpeakingInProgress = useRef<boolean>(false);
   
   // Define WakeLock types
   type WakeLockSentinel = {
@@ -256,10 +257,17 @@ export default function ChapterPage() {
 
   // Text-to-speech functions
   const speakNextParagraph = () => {
+    // Prevent multiple simultaneous speech processes
+    if (isSpeakingInProgress.current) {
+      console.log('Speech already in progress, ignoring duplicate call');
+      return;
+    }
+
     if (!speechSynthesis || currentParagraphIndex.current >= paragraphsRef.current.length) {
       setIsSpeaking(false);
       setIsPaused(false);
-      currentParagraphIndex.current = 0;
+      // Don't reset to beginning, keep the last position
+      // currentParagraphIndex.current = 0;
       setCurrentHighlightIndex(-1);
       
       // Stop silent audio if it's playing (for Android)
@@ -267,8 +275,11 @@ export default function ChapterPage() {
         silentAudioRef.current.pause();
       }
       
+      isSpeakingInProgress.current = false;
       return;
     }
+    
+    isSpeakingInProgress.current = true;
     
     const utterance = new SpeechSynthesisUtterance(paragraphsRef.current[currentParagraphIndex.current]);
     
@@ -295,12 +306,38 @@ export default function ChapterPage() {
     };
     
     utterance.onend = () => {
-      currentParagraphIndex.current += 1;
-      speakNextParagraph();
+      // Release the lock to allow next paragraph to be spoken
+      isSpeakingInProgress.current = false;
+      
+      // Only proceed if we're still in speaking mode
+      if (isSpeaking && !isPaused) {
+        currentParagraphIndex.current += 1;
+        
+        // Check if we've reached the end before calling speakNextParagraph
+        if (currentParagraphIndex.current < paragraphsRef.current.length) {
+          // Small delay to prevent potential race conditions
+          setTimeout(() => {
+            speakNextParagraph();
+          }, 50);
+        } else {
+          // We've reached the end, stop speaking
+          setIsSpeaking(false);
+          setIsPaused(false);
+          setCurrentHighlightIndex(-1);
+          
+          // Stop silent audio if it's playing (for Android)
+          if (silentAudioRef.current) {
+            silentAudioRef.current.pause();
+          }
+        }
+      }
     };
     
     utterance.onerror = (event) => {
       console.error('Speech synthesis error:', event);
+      
+      // Release the lock on error
+      isSpeakingInProgress.current = false;
       
       // If the error is not due to cancellation, try to recover
       if (event.error !== 'canceled' && isSpeaking && !isPaused) {
@@ -321,6 +358,11 @@ export default function ChapterPage() {
     };
     
     currentUtterance.current = utterance;
+    
+    // Clear any existing speech queue to prevent duplicates
+    speechSynthesis.cancel();
+    
+    // Speak the current paragraph
     speechSynthesis.speak(utterance);
   };
   
@@ -355,8 +397,12 @@ export default function ChapterPage() {
       speechSynthesis.cancel();
       setIsSpeaking(false);
       setIsPaused(false);
-      currentParagraphIndex.current = 0;
+      // Don't reset to beginning, keep the last position
+      // currentParagraphIndex.current = 0;
       setCurrentHighlightIndex(-1);
+      
+      // Reset the in-progress flag
+      isSpeakingInProgress.current = false;
       
       // Stop silent audio if it's playing (for Android)
       if (silentAudioRef.current) {
@@ -415,6 +461,8 @@ export default function ChapterPage() {
             // We'll save the current position and restart when visible again
             if (speechSynthesis) {
               speechSynthesis.cancel();
+              // Reset the in-progress flag
+              isSpeakingInProgress.current = false;
             }
           } else {
             // For other devices, we'll handle it when the page becomes visible again
@@ -424,13 +472,27 @@ export default function ChapterPage() {
       } else if (document.visibilityState === 'visible') {
         // Page is visible again (screen unlocked or app in foreground)
         if (wasPlayingBeforeHidden.current) {
-          // Check if speech synthesis is in a paused state
-          if (speechSynthesis && speechSynthesis.paused) {
-            speechSynthesis.resume();
-          } else if (isIOS.current || (speechSynthesis && !speechSynthesis.speaking && currentParagraphIndex.current < paragraphsRef.current.length)) {
-            // If speech stopped completely but we were in the middle of reading, restart from current paragraph
-            // For iOS, we always need to restart
-            speakNextParagraph();
+          // Only try to resume if we haven't reached the end and we're not already speaking
+          if (currentParagraphIndex.current < paragraphsRef.current.length && !isSpeakingInProgress.current) {
+            // Check if speech synthesis is in a paused state
+            if (speechSynthesis && speechSynthesis.paused) {
+              speechSynthesis.resume();
+            } else if (isIOS.current || (speechSynthesis && !speechSynthesis.speaking)) {
+              // If speech stopped completely but we were in the middle of reading, restart from current paragraph
+              // For iOS, we always need to restart
+              // Add a small delay to ensure everything is ready
+              setTimeout(() => {
+                if (!isSpeakingInProgress.current) {
+                  speakNextParagraph();
+                }
+              }, 300);
+            }
+          } else {
+            // We've reached the end or speech is already in progress, don't try to resume
+            if (currentParagraphIndex.current >= paragraphsRef.current.length) {
+              setIsSpeaking(false);
+              setIsPaused(false);
+            }
           }
           wasPlayingBeforeHidden.current = false;
         }
@@ -451,16 +513,22 @@ export default function ChapterPage() {
     // Chrome has a bug where it stops speech synthesis after ~15 seconds
     // This is a workaround to keep it going
     const handleChromeBug = () => {
-      if (speechSynthesis && isSpeaking && !isPaused) {
+      if (speechSynthesis && isSpeaking && !isPaused && speechSynthesis.speaking) {
+        // Only apply the fix if speech is actually in progress
         // This is a workaround for Chrome's bug
         // We need to pause and resume to keep it going
         speechSynthesis.pause();
-        speechSynthesis.resume();
+        setTimeout(() => {
+          if (isSpeaking && !isPaused) {
+            speechSynthesis.resume();
+          }
+        }, 50);
       }
     };
     
     // Set up interval to prevent Chrome from stopping speech synthesis
-    const intervalId = setInterval(handleChromeBug, 10000);
+    // Increased interval to reduce potential for issues
+    const intervalId = setInterval(handleChromeBug, 15000);
     
     return () => {
       clearInterval(intervalId);
@@ -469,20 +537,29 @@ export default function ChapterPage() {
 
   // Add a recovery mechanism for speech synthesis errors
   useEffect(() => {
-    if (!isSpeaking || typeof window === 'undefined') return;
+    if (!isSpeaking || isPaused || typeof window === 'undefined') return;
     
     // This is a safety mechanism to recover from speech synthesis errors
     // If speech synthesis stops unexpectedly, we'll try to restart it
     const recoverySafetyCheck = () => {
+      // Only attempt recovery if we're supposed to be speaking but nothing is happening
+      // and we're not already in the process of speaking
       if (isSpeaking && !isPaused && speechSynthesis && 
           !speechSynthesis.speaking && 
+          !isSpeakingInProgress.current &&
           currentParagraphIndex.current < paragraphsRef.current.length) {
         console.log('Speech synthesis recovery: Detected speech stopped unexpectedly, restarting');
-        speakNextParagraph();
+        // Add a small delay before restarting to prevent race conditions
+        setTimeout(() => {
+          if (isSpeaking && !isPaused && !speechSynthesis.speaking) {
+            speakNextParagraph();
+          }
+        }, 500);
       }
     };
     
-    const recoveryIntervalId = setInterval(recoverySafetyCheck, 5000);
+    // Increased interval to reduce potential for issues
+    const recoveryIntervalId = setInterval(recoverySafetyCheck, 10000);
     
     return () => {
       clearInterval(recoveryIntervalId);
@@ -554,6 +631,26 @@ export default function ChapterPage() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isSpeaking, isPaused]);
+
+  // Cleanup speech synthesis when component unmounts
+  useEffect(() => {
+    return () => {
+      if (speechSynthesis) {
+        speechSynthesis.cancel();
+      }
+      
+      if (silentAudioRef.current) {
+        silentAudioRef.current.pause();
+      }
+      
+      // Release wake lock if it exists
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch(err => {
+          console.error('Error releasing wake lock:', err);
+        });
+      }
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -818,4 +915,4 @@ export default function ChapterPage() {
       </div>
     </Layout>
   );
-} 
+}
