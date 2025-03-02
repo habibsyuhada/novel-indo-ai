@@ -224,6 +224,8 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
               <ul className="list-disc pl-5 mt-1 space-y-1">
                 <li>Pause/Resume reading at any time</li>
                 <li>Stop reading to reset to the beginning</li>
+                <li>See highlighted text that&apos;s currently being read</li>
+                <li>Click any paragraph to start reading from that point</li>
                 <li>Adjust voice and speed in these settings</li>
               </ul>
             </div>

@@ -14,6 +14,8 @@ A modern web application for reading novels online, built with Next.js, DaisyUI,
 
 ### Accessibility
 - Text-to-speech functionality with pause/resume capability
+- Visual text highlighting of currently spoken paragraph (without padding)
+- Click-to-read functionality for starting speech from any paragraph
 - Customizable speech rate and voice selection (saved to localStorage)
 - Responsive design for all devices
 - Keyboard navigation support
@@ -33,6 +35,8 @@ The application includes a centralized settings panel accessible from any page:
   - Voice selection from available system voices
   - Speech rate adjustment
   - Pause/resume controls while reading
+  - Visual text highlighting for better focus
+  - Click-to-read from any paragraph
 
 All user settings are automatically saved to localStorage, ensuring preferences persist between sessions.
 
@@ -44,7 +48,7 @@ All user settings are automatically saved to localStorage, ensuring preferences 
 - **Database**: Supabase
 - **State Management**: React Hooks
 - **Styling**: CSS Modules, Tailwind CSS
-- **Accessibility**: Native Web Speech API with enhanced controls
+- **Accessibility**: Native Web Speech API with enhanced controls and visual feedback
 
 ### Database Schema
 - `novel` table: Stores novel metadata (title, author, description, etc.)
@@ -73,6 +77,8 @@ The application is fully optimized for mobile devices:
 - ARIA attributes for interactive elements
 - Keyboard navigation support
 - Text-to-speech functionality with pause/resume controls
+- Visual highlighting of currently spoken text
+- Click-to-read from any paragraph
 - Adjustable font sizes
 - High contrast mode (via theme toggle)
 

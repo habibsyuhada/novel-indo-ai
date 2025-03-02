@@ -25,10 +25,12 @@ export default function ChapterPage() {
   const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
   const [selectedVoiceIndex, setSelectedVoiceIndex] = useState<number>(0);
   const [speechRate, setSpeechRate] = useState(1);
+  const [currentHighlightIndex, setCurrentHighlightIndex] = useState<number>(-1);
   const speechSynthesis = typeof window !== 'undefined' ? window.speechSynthesis : null;
   const currentUtterance = useRef<SpeechSynthesisUtterance | null>(null);
   const paragraphsRef = useRef<string[]>([]);
   const currentParagraphIndex = useRef<number>(0);
+  const paragraphElementsRef = useRef<(HTMLParagraphElement | null)[]>([]);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -105,6 +107,9 @@ export default function ChapterPage() {
               .split('\n')
               .filter((paragraph: string) => paragraph.trim() !== '');
             
+            // Initialize paragraph elements ref array
+            paragraphElementsRef.current = new Array(paragraphsRef.current.length).fill(null);
+            
             // Check for previous chapter
             const { data: prevChapterData } = await supabase
               .from('novel_chapter')
@@ -177,6 +182,7 @@ export default function ChapterPage() {
     return () => {
       stopSpeaking();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVoiceIndex]);
 
   // Reading progress
@@ -198,29 +204,27 @@ export default function ChapterPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Text-to-speech functions
-  const speakText = () => {
-    if (!speechSynthesis || paragraphsRef.current.length === 0) return;
-    
-    if (isSpeaking) {
-      if (isPaused) {
-        resumeSpeaking();
-      } else {
-        pauseSpeaking();
+  // Scroll to highlighted paragraph
+  useEffect(() => {
+    if (currentHighlightIndex >= 0 && paragraphElementsRef.current[currentHighlightIndex]) {
+      const paragraphElement = paragraphElementsRef.current[currentHighlightIndex];
+      if (paragraphElement) {
+        // Scroll the paragraph into view with a smooth behavior
+        paragraphElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
       }
-      return;
     }
-    
-    setIsSpeaking(true);
-    setIsPaused(false);
-    speakNextParagraph();
-  };
-  
+  }, [currentHighlightIndex]);
+
+  // Text-to-speech functions
   const speakNextParagraph = () => {
     if (!speechSynthesis || currentParagraphIndex.current >= paragraphsRef.current.length) {
       setIsSpeaking(false);
       setIsPaused(false);
       currentParagraphIndex.current = 0;
+      setCurrentHighlightIndex(-1);
       return;
     }
     
@@ -232,6 +236,10 @@ export default function ChapterPage() {
     
     utterance.rate = speechRate;
     
+    utterance.onstart = () => {
+      setCurrentHighlightIndex(currentParagraphIndex.current);
+    };
+    
     utterance.onend = () => {
       currentParagraphIndex.current += 1;
       speakNextParagraph();
@@ -241,6 +249,7 @@ export default function ChapterPage() {
       console.error('Speech synthesis error:', event);
       setIsSpeaking(false);
       setIsPaused(false);
+      setCurrentHighlightIndex(-1);
     };
     
     currentUtterance.current = utterance;
@@ -267,6 +276,36 @@ export default function ChapterPage() {
       setIsSpeaking(false);
       setIsPaused(false);
       currentParagraphIndex.current = 0;
+      setCurrentHighlightIndex(-1);
+    }
+  };
+
+  // Set paragraph ref
+  const setParagraphRef = (element: HTMLParagraphElement | null, index: number) => {
+    paragraphElementsRef.current[index] = element;
+  };
+
+  // Handle paragraph click to start reading from that paragraph
+  const handleParagraphClick = (index: number) => {
+    // If already speaking, stop first
+    if (isSpeaking) {
+      stopSpeaking();
+      
+      // Small delay to ensure speech synthesis is reset before starting again
+      setTimeout(() => {
+        setIsSpeaking(true);
+        setIsPaused(false);
+        currentParagraphIndex.current = index;
+        setCurrentHighlightIndex(index);
+        speakNextParagraph();
+      }, 100);
+    } else {
+      // Start speaking from the clicked paragraph
+      setIsSpeaking(true);
+      setIsPaused(false);
+      currentParagraphIndex.current = index;
+      setCurrentHighlightIndex(index);
+      speakNextParagraph();
     }
   };
 
@@ -362,7 +401,7 @@ export default function ChapterPage() {
                 </>
               ) : (
                 <button 
-                  onClick={speakText} 
+                  onClick={() => handleParagraphClick(0)} 
                   className="btn btn-sm md:btn-md btn-primary"
                   aria-label="Read aloud"
                 >
@@ -441,7 +480,16 @@ export default function ChapterPage() {
               style={{ fontSize: `${fontSize}px` }}
             >
               {chapterData.text.split('\n').filter(paragraph => paragraph.trim() !== '').map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
+                <p 
+                  key={index} 
+                  ref={(el) => setParagraphRef(el, index)}
+                  className={currentHighlightIndex === index ? 'bg-primary bg-opacity-20 rounded transition-all duration-300' : ''}
+                  onClick={() => handleParagraphClick(index)}
+                  style={{ cursor: 'pointer' }}
+                  title="Click to read from this paragraph"
+                >
+                  {paragraph}
+                </p>
               ))}
             </div>
           </div>
