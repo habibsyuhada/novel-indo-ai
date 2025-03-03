@@ -8,13 +8,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export type Novel = {
   id: number;
   name: string;
+  description: string;
   author: string;
   genre: string;
+  tag: string;
   status: number;
   publishers: string;
-  tag: string;
-  year: number;
-  description: string;
+  year: string;
+  cover: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type NovelChapter = {
