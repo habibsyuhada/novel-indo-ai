@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import UserSettings from './UserSettings';
-import InstallPWA from './InstallPWA';
+// import InstallPWA from './InstallPWA';
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -129,7 +129,7 @@ const Layout: React.FC<LayoutProps> = ({
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
       />
-      <InstallPWA />
+      {/* <InstallPWA /> */}
     </div>
   );
 };
