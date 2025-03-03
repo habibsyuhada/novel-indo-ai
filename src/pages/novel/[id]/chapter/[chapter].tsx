@@ -191,27 +191,36 @@ export default function ChapterPage() {
     
     return (
       <article 
+        id="chapter-content" 
+        ref={contentRef}
         itemScope 
         itemType="https://schema.org/Article"
-        className={styles.chapterContent}
+        className={`flex-1 ${isMobile ? "pb-16" : "pr-4"} ${styles.chapterContent}`}
         style={{ fontSize: `${fontSize}px` }}
       >
         <meta itemProp="headline" content={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title}`} />
         <meta itemProp="author" content={novel.author || 'Novel Indo'} />
         <meta itemProp="inLanguage" content="id" />
+
+        <h1 className="text-xl md:text-2xl mb-4 font-bold">
+          Chapter {chapterData.chapter}: {chapterData.title}
+        </h1>
         
-        <div itemProp="articleBody">
+        <section 
+          itemProp="articleBody"
+          lang="id"
+          className="mt-6"
+        >
           {paragraphs.map((paragraph: string, index: number) => (
             <p 
               key={index}
               className="mb-4"
               tabIndex={0}
-              lang="id"
             >
               {paragraph}
             </p>
           ))}
-        </div>
+        </section>
       </article>
     );
   };
@@ -416,23 +425,9 @@ export default function ChapterPage() {
 
       <div className="card bg-base-100 shadow-xl mb-4 md:mb-6">
         <div className="card-body p-3 md:p-6">
-          <h1 className="card-title text-xl md:text-2xl mb-2">
-            Chapter {chapterData.chapter}: {chapterData.title}
-          </h1>
-          
-          <div className="divider my-2"></div>
           
           <div className="flex">
-            <main 
-              id="chapter-content" 
-              ref={contentRef}
-              role="main"
-              aria-label="Chapter content"
-              lang="id"
-              className={`flex-1 ${isMobile ? "pb-16" : "pr-4"}`}
-            >
-              {renderChapterContent()}
-            </main>
+            {renderChapterContent()}
 
             {/* Desktop sidebar */}
             {!isMobile && (

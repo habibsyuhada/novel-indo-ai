@@ -115,7 +115,10 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
       </header>
 
-      <main className="flex-grow container mx-auto px-2 md:px-4 py-4 md:py-8">
+      <main 
+        className="flex-grow container mx-auto px-2 md:px-4 py-4 md:py-8"
+        role="main"
+      >
         {children}
       </main>
 
