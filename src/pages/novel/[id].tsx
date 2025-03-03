@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
 import Layout from '../../components/Layout';
-import { supabase, Novel } from '../../lib/supabase';
+import { supabase, Novel, getStorageUrl } from '../../lib/supabase';
 
 // Buat tipe baru untuk daftar chapter yang tidak memerlukan semua properti NovelChapter
 type ChapterListItem = {
@@ -145,7 +145,7 @@ export default function NovelDetail() {
                 <div className="relative aspect-[3/4] rounded-lg overflow-hidden shadow-lg">
                   {novel.cover ? (
                     <Image
-                      src={novel.cover}
+                      src={getStorageUrl(novel.cover)}
                       alt={`Cover of ${novel.name}`}
                       fill
                       className="object-cover"

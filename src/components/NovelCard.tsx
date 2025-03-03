@@ -1,33 +1,35 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Novel } from '../lib/supabase';
+import { Novel, getStorageUrl } from '../lib/supabase';
 
-interface NovelCardProps {
+type NovelCardProps = {
   novel: Novel;
-}
+};
 
-const NovelCard: React.FC<NovelCardProps> = ({ novel }) => {
+export default function NovelCard({ novel }: NovelCardProps) {
   // Format genre list
-  const genres = novel.genre ? novel.genre.split(';').filter(g => g.trim()) : [];
+  const genres = novel.genre.split(';').filter(g => g.trim() !== '');
+  const coverUrl = novel.cover ? getStorageUrl(novel.cover) : null;
 
   return (
-    <Link href={`/novel/${novel.id}`} className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow duration-300">
-      <figure className="relative aspect-[3/4] w-full">
-        {novel.cover ? (
+    <Link href={`/novel/${novel.id}`} className="card bg-base-100 hover:shadow-xl transition-shadow duration-200">
+      <figure className="relative aspect-[3/4]">
+        {coverUrl ? (
           <Image
-            src={novel.cover}
+            src={coverUrl}
             alt={`Cover of ${novel.name}`}
             fill
             className="object-cover"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 16vw"
           />
         ) : (
-          <div className="w-full h-full bg-base-200 flex items-center justify-center">
+          <div className="w-full h-full bg-base-300 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 text-base-content/30">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
           </div>
         )}
+        {/* Status badge */}
         <div className="absolute top-2 right-2">
           <span className={`badge ${novel.status === 1 ? 'badge-warning' : 'badge-success'}`}>
             {novel.status === 1 ? 'Ongoing' : 'Completed'}
@@ -35,29 +37,21 @@ const NovelCard: React.FC<NovelCardProps> = ({ novel }) => {
         </div>
       </figure>
       
-      <div className="card-body p-4">
-        <h2 className="card-title text-lg leading-tight line-clamp-2">{novel.name}</h2>
+      <div className="card-body p-3">
+        <h2 className="card-title text-base line-clamp-2">{novel.name}</h2>
+        <p className="text-sm text-base-content/70 line-clamp-1">{novel.author}</p>
         
-        <div className="flex items-center gap-1 text-sm text-base-content/70">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-          </svg>
-          <span>{novel.author || 'Unknown'}</span>
-        </div>
-
         {genres.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
-            {genres.slice(0, 3).map((genre, index) => (
-              <span key={index} className="badge badge-sm badge-primary">{genre}</span>
+            {genres.slice(0, 2).map((genre) => (
+              <span key={genre} className="badge badge-sm badge-primary">{genre}</span>
             ))}
-            {genres.length > 3 && (
-              <span className="badge badge-sm">+{genres.length - 3}</span>
+            {genres.length > 2 && (
+              <span className="badge badge-sm">+{genres.length - 2}</span>
             )}
           </div>
         )}
       </div>
     </Link>
   );
-};
-
-export default NovelCard; 
+} 
