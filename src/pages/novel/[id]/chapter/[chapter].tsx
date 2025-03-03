@@ -190,29 +190,29 @@ export default function ChapterPage() {
     const paragraphs = chapterData.text.split('\n').filter(p => p.trim() !== '');
     
     return (
-      <div 
-        className={styles.chapterContent} 
-        style={{ fontSize: `${fontSize}px` }}
-        role="article"
-        aria-label={`${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title}`}
-        lang="id"
-        itemScope
+      <article 
+        itemScope 
         itemType="https://schema.org/Article"
+        className={styles.chapterContent}
+        style={{ fontSize: `${fontSize}px` }}
       >
         <meta itemProp="headline" content={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title}`} />
         <meta itemProp="author" content={novel.author || 'Novel Indo'} />
+        <meta itemProp="inLanguage" content="id" />
         
-        {paragraphs.map((paragraph, index) => (
-          <p 
-            key={index}
-            className="mb-4"
-            tabIndex={0}
-            itemProp="text"
-          >
-            {paragraph}
-          </p>
-        ))}
-      </div>
+        <div itemProp="articleBody">
+          {paragraphs.map((paragraph: string, index: number) => (
+            <p 
+              key={index}
+              className="mb-4"
+              tabIndex={0}
+              lang="id"
+            >
+              {paragraph}
+            </p>
+          ))}
+        </div>
+      </article>
     );
   };
 
@@ -387,10 +387,12 @@ export default function ChapterPage() {
       <Head>
         <title>{novel.name} - Chapter {chapterData.chapter}: {chapterData.title} - Novel Indo</title>
         <meta name="description" content={`Read ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title}`} />
-        {/* Add metadata to help Chrome detect readable content */}
         <meta name="article:section" content="Novel Chapter" />
         <meta name="article:tag" content={`${novel.name}, Chapter ${chapterData.chapter}, ${novel.genre || 'Novel'}`} />
         <meta property="og:type" content="article" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta httpEquiv="Content-Language" content="id" />
+        <meta name="language" content="Indonesian" />
       </Head>
 
       <div className="fixed top-0 left-0 w-full h-1 bg-base-300 z-50">
