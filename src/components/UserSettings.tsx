@@ -8,6 +8,19 @@ type UserSettingsProps = {
 const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
   const [fontSize, setFontSize] = useState<number>(18);
   const [theme, setTheme] = useState<string>('light');
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -58,7 +71,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
       <input id="settings-drawer" type="checkbox" className="drawer-toggle" checked={isOpen} readOnly />
       <div className="drawer-side">
         <label htmlFor="settings-drawer" className="drawer-overlay" onClick={onClose}></label>
-        <div className="bg-base-100 w-full max-w-full h-full flex flex-col">
+        <div className={`bg-base-100 h-full flex flex-col ${isMobile ? 'w-full' : 'w-[320px] shadow-xl'}`}>
           <div className="p-4 border-b border-base-300">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold">User Settings</h2>
