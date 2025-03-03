@@ -8,19 +8,6 @@ type UserSettingsProps = {
 const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
   const [fontSize, setFontSize] = useState<number>(18);
   const [theme, setTheme] = useState<string>('light');
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Check if device is mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -151,7 +138,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
               </label>
               <div className="text-xs text-base-content/70 p-2 bg-info bg-opacity-20 rounded">
                 <p className="font-medium mb-1">Chrome Mobile Users:</p>
-                <p>To listen to any page, tap the three dots menu, then select "Listen to this page".</p>
+                <p>To listen to any page, tap the three dots menu, then select &ldquo;Listen to this page&rdquo;.</p>
               </div>
             </div>
           </div>

@@ -13,7 +13,6 @@ const Layout: React.FC<LayoutProps> = ({
   isSettingsOpen: externalIsSettingsOpen, 
   setIsSettingsOpen: externalSetIsSettingsOpen 
 }) => {
-  const [theme, setTheme] = useState<string>('light');
   const [isMobile, setIsMobile] = useState(false);
   const [internalIsSettingsOpen, setInternalIsSettingsOpen] = useState(false);
 
@@ -22,19 +21,6 @@ const Layout: React.FC<LayoutProps> = ({
   const setIsSettingsOpen = externalSetIsSettingsOpen || setInternalIsSettingsOpen;
 
   useEffect(() => {
-    // Check for saved theme preference or use system preference
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.setAttribute('data-theme', savedTheme);
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const systemTheme = prefersDark ? 'dark' : 'light';
-      setTheme(systemTheme);
-      document.documentElement.setAttribute('data-theme', systemTheme);
-      localStorage.setItem('theme', systemTheme); // Save the initial theme
-    }
-    
     // Check if device is mobile
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -45,13 +31,6 @@ const Layout: React.FC<LayoutProps> = ({
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-  };
 
   return (
     <div className="min-h-screen flex flex-col">
