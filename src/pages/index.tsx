@@ -4,6 +4,7 @@ import NovelCard from '../components/NovelCard';
 import { supabase, Novel } from '../lib/supabase';
 import SEO from '../components/SEO';
 import JsonLd from '../components/JsonLd';
+import { trackSearch } from '../lib/gtm';
 
 export default function Home() {
   const [novels, setNovels] = useState<Novel[]>([]);
@@ -70,7 +71,13 @@ export default function Home() {
   }, [searchTerm, novels]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
+    const value = e.target.value;
+    setSearchTerm(value);
+    
+    // Track search if there's a search term
+    if (value.trim()) {
+      trackSearch(value.trim());
+    }
   };
 
   return (

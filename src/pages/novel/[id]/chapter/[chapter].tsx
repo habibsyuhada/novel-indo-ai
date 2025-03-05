@@ -6,6 +6,7 @@ import { supabase, Novel, NovelChapter } from '../../../../lib/supabase';
 import styles from '../../../../styles/chapter.module.css';
 import SEO from '../../../../components/SEO';
 import JsonLd, { generateArticleData, generateBreadcrumbData } from '../../../../components/JsonLd';
+import { trackChapterView } from '../../../../lib/gtm';
 
 export default function ChapterPage() {
   const router = useRouter();
@@ -111,6 +112,14 @@ export default function ChapterPage() {
           
           if (currentChapter) {
             setChapterData(currentChapter);
+            
+            // Track chapter view
+            trackChapterView({
+              id: currentChapter.id,
+              novel_id: novelData.id,
+              chapter: currentChapter.chapter,
+              title: currentChapter.title
+            });
             
             // Check for previous chapter
             const { data: prevChapterData } = await supabase

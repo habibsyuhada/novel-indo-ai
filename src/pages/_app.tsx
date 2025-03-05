@@ -2,8 +2,16 @@ import '../styles/globals.css';
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
 import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../components/Layout';
+import { initGTM, trackPageView } from '../lib/gtm';
+
+// Initialize GTM with your container ID
+const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID || '';
 
 function MyApp({ Component, pageProps }: AppProps) {
+  const router = useRouter();
+
   useEffect(() => {
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       window.addEventListener('load', function() {
@@ -19,8 +27,22 @@ function MyApp({ Component, pageProps }: AppProps) {
     }
   }, []);
 
+  useEffect(() => {
+    // Initialize GTM
+    if (GTM_ID) {
+      initGTM(GTM_ID);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Track page views
+    if (router.isReady) {
+      trackPageView(router.asPath);
+    }
+  }, [router.isReady, router.asPath]);
+
   return (
-    <>
+    <Layout>
       <Head>
         <title>Baca Novel Indo - Read Your Favorite Novels</title>
         <meta name="description" content="Read your favorite novels online" />
@@ -28,7 +50,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         <link rel="icon" href="/favicon.ico" />
       </Head>
       <Component {...pageProps} />
-    </>
+    </Layout>
   );
 }
 

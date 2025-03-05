@@ -6,6 +6,7 @@ import Layout from '../../components/Layout';
 import { supabase, Novel, getStorageUrl } from '../../lib/supabase';
 import SEO from '../../components/SEO';
 import JsonLd, { generateBookData, generateBreadcrumbData } from '../../components/JsonLd';
+import { trackNovelView } from '../../lib/gtm';
 
 // Buat tipe baru untuk daftar chapter yang tidak memerlukan semua properti NovelChapter
 type ChapterListItem = {
@@ -78,6 +79,13 @@ export default function NovelDetail() {
         
         if (novelData) {
           setNovel(novelData);
+          
+          // Track novel view
+          trackNovelView({
+            id: novelData.id,
+            name: novelData.name,
+            author: novelData.author || 'Unknown'
+          });
           
           // Get total chapter count
           const { count } = await supabase
