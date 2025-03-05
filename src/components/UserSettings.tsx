@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../store/store';
+import { setFontSize, setTheme } from '../store/settingsSlice';
 
 type UserSettingsProps = {
   isOpen: boolean;
@@ -6,9 +9,9 @@ type UserSettingsProps = {
 };
 
 const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
-  const [fontSize, setFontSize] = useState<number>(18);
-  const [theme, setTheme] = useState<string>('light');
   const [isMobile, setIsMobile] = useState(false);
+  const dispatch = useDispatch();
+  const { fontSize, theme } = useSelector((state: RootState) => state.settings);
 
   // Check if device is mobile
   useEffect(() => {
@@ -28,22 +31,22 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
       // Load font size
       const savedFontSize = localStorage.getItem('fontSize');
       if (savedFontSize) {
-        setFontSize(parseInt(savedFontSize));
+        dispatch(setFontSize(parseInt(savedFontSize)));
       }
       
       // Load theme
       const savedTheme = localStorage.getItem('theme');
       if (savedTheme) {
-        setTheme(savedTheme);
+        dispatch(setTheme(savedTheme as 'light' | 'dark'));
       }
     }
-  }, []);
+  }, [dispatch]);
 
   // Font size handlers
   const increaseFontSize = () => {
     if (fontSize < 24) {
       const newSize = fontSize + 1;
-      setFontSize(newSize);
+      dispatch(setFontSize(newSize));
       localStorage.setItem('fontSize', newSize.toString());
     }
   };
@@ -51,7 +54,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
   const decreaseFontSize = () => {
     if (fontSize > 14) {
       const newSize = fontSize - 1;
-      setFontSize(newSize);
+      dispatch(setFontSize(newSize));
       localStorage.setItem('fontSize', newSize.toString());
     }
   };
@@ -59,7 +62,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
   // Theme handler
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
+    dispatch(setTheme(newTheme));
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
   };
@@ -127,7 +130,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                   value={fontSize} 
                   onChange={(e) => {
                     const newSize = parseInt(e.target.value);
-                    setFontSize(newSize);
+                    dispatch(setFontSize(newSize));
                     localStorage.setItem('fontSize', newSize.toString());
                   }}
                   className="range range-primary range-sm flex-1" 

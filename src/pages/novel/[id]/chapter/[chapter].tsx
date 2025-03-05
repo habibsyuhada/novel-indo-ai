@@ -6,6 +6,9 @@ import styles from '../../../../styles/chapter.module.css';
 import SEO from '../../../../components/SEO';
 import JsonLd, { generateArticleData, generateBreadcrumbData } from '../../../../components/JsonLd';
 import { trackChapterView } from '../../../../lib/gtm';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../../../../store/store';
+import { toggleSettings } from '../../../../store/settingsSlice';
 
 export default function ChapterPage() {
   const router = useRouter();
@@ -16,16 +19,16 @@ export default function ChapterPage() {
   const [prevChapter, setPrevChapter] = useState<number | null>(null);
   const [nextChapter, setNextChapter] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [fontSize, setFontSize] = useState<number>(18);
   const [readingProgress, setReadingProgress] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showChapterList, setShowChapterList] = useState(false);
   const [chapterList, setChapterList] = useState<{chapter: number, title: string}[]>([]);
   const [totalChapters, setTotalChapters] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const chaptersPerPage = 100;
+  const dispatch = useDispatch();
+  const { fontSize } = useSelector((state: RootState) => state.settings);
 
   // Check if device is mobile
   useEffect(() => {
@@ -37,17 +40,6 @@ export default function ChapterPage() {
     window.addEventListener('resize', checkMobile);
     
     return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Load saved settings from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Load font size
-      const savedFontSize = localStorage.getItem('fontSize');
-      if (savedFontSize) {
-        setFontSize(parseInt(savedFontSize));
-      }
-    }
   }, []);
 
   // Fetch a specific page of chapters
@@ -542,7 +534,7 @@ export default function ChapterPage() {
 
                     <div className="flex justify-between items-center">
                     <button 
-                      onClick={() => setIsSettingsOpen(true)}
+                      onClick={() => dispatch(toggleSettings())}
                       className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
                       aria-label="Open settings"
                       title="Settings"
@@ -630,7 +622,7 @@ export default function ChapterPage() {
           </button>
           
           <button 
-            onClick={() => setIsSettingsOpen(true)}
+            onClick={() => dispatch(toggleSettings())}
             className="text-base-content"
             aria-label="Open settings"
           >

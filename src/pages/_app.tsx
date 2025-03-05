@@ -5,6 +5,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { initGTM, trackPageView } from '../lib/gtm';
+import { Provider } from 'react-redux';
+import { store } from '../store/store';
 
 // Initialize GTM with your container ID
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID || '';
@@ -42,15 +44,17 @@ function MyApp({ Component, pageProps }: AppProps) {
   }, [router.isReady, router.asPath]);
 
   return (
-    <Layout>
-      <Head>
-        <title>Baca Novel Indo - Read Your Favorite Novels</title>
-        <meta name="description" content="Read your favorite novels online" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-      <Component {...pageProps} />
-    </Layout>
+    <Provider store={store}>
+      <Layout>
+        <Head>
+          <title>Baca Novel Indo - Read Your Favorite Novels</title>
+          <meta name="description" content="Read your favorite novels online" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <link rel="icon" href="/favicon.ico" />
+        </Head>
+        <Component {...pageProps} />
+      </Layout>
+    </Provider>
   );
 }
 
