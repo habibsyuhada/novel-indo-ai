@@ -40,8 +40,8 @@ export default function NovelCard({ novel, totalChapters = 0 }: NovelCardProps) 
         {/* Text Content - Right Side */}
         <div className="flex-1 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className={`badge ${novel.status === 1 ? 'badge-warning' : 'badge-success'}`}>
-              {novel.status === 1 ? 'Ongoing' : 'Completed'}
+            <span className={`badge ${novel.status === 0 ? 'badge-warning' : 'badge-success'}`}>
+              {novel.status === 0 ? 'Ongoing' : 'Completed'}
             </span>
           </div>
           

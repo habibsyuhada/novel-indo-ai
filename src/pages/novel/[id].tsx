@@ -216,7 +216,7 @@ export default function NovelDetail() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
                   <div className="space-y-2">
                     <p><span className="font-semibold">Author:</span> {novel.author || 'Unknown'}</p>
-                    <p><span className="font-semibold">Status:</span> <span className={`badge ${novel.status === 1 ? 'badge-warning' : 'badge-success'}`}>{novel.status === 1 ? 'Ongoing' : 'Completed'}</span></p>
+                    <p><span className="font-semibold">Status:</span> <span className={`badge ${novel.status === 0 ? 'badge-warning' : 'badge-success'}`}>{novel.status === 0 ? 'Ongoing' : 'Completed'}</span></p>
                     <p><span className="font-semibold">Publisher:</span> {novel.publishers || 'Unknown'}</p>
                     <p><span className="font-semibold">Year:</span> {novel.year || 'Unknown'}</p>
                     <div>
