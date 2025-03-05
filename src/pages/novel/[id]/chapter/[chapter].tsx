@@ -196,6 +196,35 @@ export default function ChapterPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle if we have novel data and chapter data
+      if (!novel || !chapterData) return;
+
+      // Don't handle if user is typing in an input or textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      switch (e.key) {
+        case 'ArrowRight':
+          if (nextChapter) {
+            router.push(`/novel/${novel.url || novel.id}/chapter/${nextChapter}`);
+          }
+          break;
+        case 'ArrowLeft':
+          if (prevChapter) {
+            router.push(`/novel/${novel.url || novel.id}/chapter/${prevChapter}`);
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [novel, chapterData, nextChapter, prevChapter, router]);
+
   // Render chapter content with proper paragraph formatting
   const renderChapterContent = () => {
     if (!chapterData || !novel) return null;
