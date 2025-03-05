@@ -25,7 +25,7 @@ export default function NovelDetail() {
   const chaptersPerPage = 50;
 
   // Format genre and tags
-  const formatList = (text: string) => {
+  const formatList = (text: string | null) => {
     if (!text) return [];
     return text.split(';').filter(item => item.trim() !== '');
   };
@@ -129,7 +129,7 @@ export default function NovelDetail() {
     <Layout>
       <Head>
         <title>{novel.name} - Novel Indo</title>
-        <meta name="description" content={novel.description} />
+        <meta name="description" content={novel.description ?? ''} />
       </Head>
 
       <div className="mb-8">
