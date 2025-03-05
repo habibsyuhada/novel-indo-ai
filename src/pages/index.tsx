@@ -5,9 +5,13 @@ import SEO from '../components/SEO';
 import JsonLd from '../components/JsonLd';
 import { trackSearch } from '../lib/gtm';
 
+type NovelWithChapters = Novel & {
+  total_chapters: number;
+};
+
 export default function Home() {
-  const [novels, setNovels] = useState<Novel[]>([]);
-  const [filteredNovels, setFilteredNovels] = useState<Novel[]>([]);
+  const [novels, setNovels] = useState<NovelWithChapters[]>([]);
+  const [filteredNovels, setFilteredNovels] = useState<NovelWithChapters[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobile, setIsMobile] = useState(false);
@@ -28,20 +32,35 @@ export default function Home() {
     const fetchNovels = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
+        // Fetch novels with total chapters count
+        const { data: novelsData, error: novelsError } = await supabase
           .from('novel')
           .select('*')
           .order('id', { ascending: false })
           .limit(10);
 
-        if (error) {
-          throw error;
-        }
+        if (novelsError) throw novelsError;
 
-        if (data) {
-          console.log(data);
-          setNovels(data);
-          setFilteredNovels(data);
+        if (novelsData) {
+          // Fetch total chapters count for each novel
+          const novelsWithChapters = await Promise.all(
+            novelsData.map(async (novel) => {
+              const { count, error: countError } = await supabase
+                .from('novel_chapter')
+                .select('id', { count: 'exact', head: true })
+                .eq('novel', novel.id);
+
+              if (countError) throw countError;
+
+              return {
+                ...novel,
+                total_chapters: count || 0
+              };
+            })
+          );
+
+          setNovels(novelsWithChapters);
+          setFilteredNovels(novelsWithChapters);
         }
       } catch (error) {
         console.error('Error fetching novels:', error);
@@ -146,9 +165,13 @@ export default function Home() {
           ) : (
             <>
               {filteredNovels.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
                   {filteredNovels.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} />
+                    <NovelCard 
+                      key={novel.id} 
+                      novel={novel} 
+                      totalChapters={novel.total_chapters}
+                    />
                   ))}
                 </div>
               ) : (
