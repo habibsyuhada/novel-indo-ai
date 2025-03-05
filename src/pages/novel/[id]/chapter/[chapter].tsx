@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import Head from 'next/head';
 import Link from 'next/link';
 import Layout from '../../../../components/Layout';
 import { supabase, Novel, NovelChapter } from '../../../../lib/supabase';
