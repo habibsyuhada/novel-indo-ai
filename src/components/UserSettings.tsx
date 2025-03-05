@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import { setFontSize, setTheme } from '../store/settingsSlice';
+import { X } from 'lucide-react';
 
 type UserSettingsProps = {
   isOpen: boolean;
@@ -83,9 +84,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                 className="btn btn-sm btn-circle"
                 aria-label="Close settings"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
           </div>
