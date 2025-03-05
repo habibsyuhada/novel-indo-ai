@@ -156,8 +156,8 @@ export default function NovelDetail() {
   return (
     <>
       <SEO 
-        title={`${novel.name} - Novel Indo`}
-        description={novel.description ?? `Baca novel ${novel.name} karya ${novel.author} secara online di Novel Indo.`}
+        title={`${novel.name} - Baca Novel Indo`}
+        description={novel.description ?? `Baca novel ${novel.name} karya ${novel.author} secara online di Baca Novel Indo.`}
         image={novel.cover ?? '/images/default-cover.jpg'}
         keywords={`${novel.name}, ${novel.author}, ${genres.join(', ')}, ${tags.join(', ')}, novel online`}
         author={novel.author}

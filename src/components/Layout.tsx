@@ -68,7 +68,7 @@ const Layout: React.FC<LayoutProps> = ({
         <div className="navbar container mx-auto px-2 md:px-4">
           <div className="flex-1">
             <Link href="/" className="btn btn-ghost text-lg md:text-xl p-1 md:p-2">
-              Novel Indo
+              Baca Novel Indo
             </Link>
           </div>
           
@@ -124,7 +124,7 @@ const Layout: React.FC<LayoutProps> = ({
 
       <footer className="footer footer-center p-2 md:p-4 bg-base-300 text-base-content text-xs md:text-sm">
         <div>
-          <p>Copyright © 2024 - Novel Indo</p>
+          <p>Copyright © 2024 - Baca Novel Indo</p>
         </div>
       </footer>
 

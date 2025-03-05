@@ -4,10 +4,10 @@ export default function Document() {
   return (
     <Html lang="id">
       <Head>
-        <meta name='application-name' content='Novel Indo' />
+        <meta name='application-name' content='Baca Novel Indo' />
         <meta name='apple-mobile-web-app-capable' content='yes' />
         <meta name='apple-mobile-web-app-status-bar-style' content='default' />
-        <meta name='apple-mobile-web-app-title' content='Novel Indo' />
+        <meta name='apple-mobile-web-app-title' content='Baca Novel Indo' />
         <meta name='description' content='Baca novel favorit Anda secara online' />
         <meta name='format-detection' content='telephone=no' />
         <meta name='mobile-web-app-capable' content='yes' />

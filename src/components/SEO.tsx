@@ -11,12 +11,12 @@ type SEOProps = {
 };
 
 export default function SEO({
-  title = 'Novel Indo - Baca Novel Indonesia Online',
+  title = 'Baca Novel Indo - Baca Novel Indonesia Online',
   description = 'Baca novel Indonesia dan terjemahan secara online. Temukan novel favorit Anda dengan berbagai genre seperti romance, fantasy, action, dan lainnya.',
   image = '/images/og-image.jpg',
   article = false,
   keywords = 'novel indonesia, baca novel online, novel terjemahan, novel romance, novel fantasy',
-  author = 'Novel Indo',
+  author = 'Baca Novel Indo',
 }: SEOProps) {
   const router = useRouter();
   const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}${router.asPath}`;

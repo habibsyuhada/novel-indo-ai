@@ -205,7 +205,7 @@ export default function ChapterPage() {
         style={{ fontSize: `${fontSize}px` }}
       >
         <meta itemProp="headline" content={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title}`} />
-        <meta itemProp="author" content={novel.author || 'Novel Indo'} />
+        <meta itemProp="author" content={novel.author || 'Baca Novel Indo'} />
         <meta itemProp="inLanguage" content="id" />
 
         <h1 className="text-xl md:text-2xl mb-4 font-bold">
@@ -397,8 +397,8 @@ export default function ChapterPage() {
   return (
     <>
       <SEO 
-        title={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title} - Novel Indo`}
-        description={`Baca ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title} karya ${novel.author} secara online di Novel Indo.`}
+        title={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title} - Baca Novel Indo`}
+        description={`Baca ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title} karya ${novel.author} secara online di Baca Novel Indo.`}
         image={novel.cover ?? '/images/default-cover.jpg'}
         keywords={`${novel.name}, Chapter ${chapterData.chapter}, ${chapterData.title}, ${novel.author}, ${novel.genre || 'Novel'}, baca novel online`}
         author={novel.author}

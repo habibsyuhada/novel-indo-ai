@@ -1,4 +1,4 @@
-# Novel Indo - Web Novel Reading Application
+# Baca Novel Indo - Web Novel Reading Application
 
 A modern web application for reading novels online, built with Next.js, DaisyUI, and Supabase.
 

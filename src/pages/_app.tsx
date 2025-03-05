@@ -22,7 +22,7 @@ function MyApp({ Component, pageProps }: AppProps) {
   return (
     <>
       <Head>
-        <title>Novel Indo - Read Your Favorite Novels</title>
+        <title>Baca Novel Indo - Read Your Favorite Novels</title>
         <meta name="description" content="Read your favorite novels online" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />

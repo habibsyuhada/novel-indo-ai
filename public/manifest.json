@@ -1,6 +1,6 @@
 {
-  "name": "Novel Indo",
-  "short_name": "Novel Indo",
+  "name": "Baca Novel Indo",
+  "short_name": "Baca Novel Indo",
   "description": "Read your favorite novels online",
   "start_url": "/",
   "scope": "/",
@@ -66,7 +66,7 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Homepage of Novel Indo"
+      "label": "Homepage of Baca Novel Indo"
     },
     {
       "src": "/screenshots/novel.png",

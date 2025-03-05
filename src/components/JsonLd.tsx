@@ -57,7 +57,7 @@ export default function JsonLd({ type, data, id }: JsonLdProps) {
           },
           publisher: {
             '@type': 'Organization',
-            name: 'Novel Indo',
+            name: 'Baca Novel Indo',
             logo: {
               '@type': 'ImageObject',
               url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}/icons/icon-192x192.png`,
@@ -122,7 +122,7 @@ export const generateBookData = (novel: Novel, url: string) => {
     author: novel.author,
     description: novel.description || `Novel ${novel.name} by ${novel.author}`,
     genre: novel.genre.split(';').filter(g => g.trim() !== '').join(', '),
-    publisher: novel.publishers || 'Novel Indo',
+    publisher: novel.publishers || 'Baca Novel Indo',
     url,
     image: novel.cover || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}/images/default-cover.jpg`,
   };

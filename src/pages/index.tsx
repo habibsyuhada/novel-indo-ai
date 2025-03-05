@@ -76,7 +76,7 @@ export default function Home() {
   return (
     <>
       <SEO 
-        title="Novel Indo - Baca Novel Indonesia Online"
+        title="Baca Novel Indo - Baca Novel Indonesia Online"
         description="Baca novel Indonesia dan terjemahan secara online. Temukan novel favorit Anda dengan berbagai genre seperti romance, fantasy, action, dan lainnya."
         keywords="novel indonesia, baca novel online, novel terjemahan, novel romance, novel fantasy, novel action, novel terbaru"
       />
@@ -85,7 +85,7 @@ export default function Home() {
         type="website" 
         data={{
           url: process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click',
-          name: 'Novel Indo',
+          name: 'Baca Novel Indo',
           description: 'Baca novel Indonesia dan terjemahan secara online. Temukan novel favorit Anda dengan berbagai genre.'
         }}
         id="json-ld-home-website"
@@ -95,7 +95,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4">
           <div className="text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Welcome to Novel Indo
+              Welcome to Baca Novel Indo
             </h1>
             <p className="text-lg md:text-xl text-base-content/70">
               Discover and read your favorite novels online
