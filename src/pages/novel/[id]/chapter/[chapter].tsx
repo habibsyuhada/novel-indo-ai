@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Layout from '../../../../components/Layout';
 import { supabase, Novel, NovelChapter } from '../../../../lib/supabase';
 import styles from '../../../../styles/chapter.module.css';
+import SEO from '../../../../components/SEO';
+import JsonLd, { generateArticleData, generateBreadcrumbData } from '../../../../components/JsonLd';
 
 export default function ChapterPage() {
   const router = useRouter();
@@ -51,7 +53,7 @@ export default function ChapterPage() {
 
   // Fetch a specific page of chapters
   const fetchChapterPage = useCallback(async (page: number) => {
-    if (!id) return;
+    if (!novel?.id) return;
     
     try {
       const from = (page - 1) * chaptersPerPage;
@@ -60,7 +62,7 @@ export default function ChapterPage() {
       const { data } = await supabase
         .from('novel_chapter')
         .select('chapter, title') // Only select needed columns, not the text content
-        .eq('novel', id)
+        .eq('novel', novel.id)
         .order('chapter', { ascending: true })
         .range(from, to);
       
@@ -71,7 +73,7 @@ export default function ChapterPage() {
     } catch (error) {
       console.error('Error fetching chapter page:', error);
     }
-  }, [id, chaptersPerPage]);
+  }, [novel?.id, chaptersPerPage]);
 
   // Fetch chapter data
   useEffect(() => {
@@ -81,12 +83,17 @@ export default function ChapterPage() {
       try {
         setLoading(true);
         
-        // Fetch novel details
-        const { data: novelData, error: novelError } = await supabase
-          .from('novel')
-          .select('*')
-          .eq('id', id)
-          .single();
+        // Fetch novel details - check if id is numeric (old ID) or string (new URL)
+        let query = supabase.from('novel').select('*');
+        
+        // Check if id is numeric (old ID) or string (new URL)
+        if (!isNaN(Number(id))) {
+          query = query.eq('id', id);
+        } else {
+          query = query.eq('url', id);
+        }
+        
+        const { data: novelData, error: novelError } = await query.single();
 
         if (novelError) throw novelError;
         
@@ -97,7 +104,7 @@ export default function ChapterPage() {
           const { data: currentChapter, error: chapterError } = await supabase
             .from('novel_chapter')
             .select('*')
-            .eq('novel', id)
+            .eq('novel', novelData.id)  // Always use the numeric ID for chapter queries
             .eq('chapter', chapter)
             .single();
 
@@ -110,7 +117,7 @@ export default function ChapterPage() {
             const { data: prevChapterData } = await supabase
               .from('novel_chapter')
               .select('chapter')
-              .eq('novel', id)
+              .eq('novel', novelData.id)
               .lt('chapter', chapter)
               .order('chapter', { ascending: false })
               .limit(1)
@@ -124,7 +131,7 @@ export default function ChapterPage() {
             const { data: nextChapterData } = await supabase
               .from('novel_chapter')
               .select('chapter')
-              .eq('novel', id)
+              .eq('novel', novelData.id)
               .gt('chapter', chapter)
               .order('chapter', { ascending: true })
               .limit(1)
@@ -138,7 +145,7 @@ export default function ChapterPage() {
             const { count } = await supabase
               .from('novel_chapter')
               .select('id', { count: 'exact', head: true })
-              .eq('novel', id);
+              .eq('novel', novelData.id);
             
             if (count !== null) {
               setTotalChapters(count);
@@ -344,7 +351,7 @@ export default function ChapterPage() {
                 {chapterList.map((item) => (
                   <li key={item.chapter}>
                     <Link 
-                      href={`/novel/${id}/chapter/${item.chapter}`}
+                      href={`/novel/${novel?.url || id}/chapter/${item.chapter}`}
                       className={parseInt(chapter as string) === item.chapter ? "active" : ""}
                       onClick={() => setShowChapterList(false)}
                     >
@@ -389,254 +396,248 @@ export default function ChapterPage() {
   }
 
   return (
-    <Layout
-      isSettingsOpen={isSettingsOpen}
-      setIsSettingsOpen={setIsSettingsOpen}
-    >
-      <Head>
-        <title>{novel.name} - Chapter {chapterData.chapter}: {chapterData.title} - Novel Indo</title>
-        <meta name="description" content={`Read ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title}`} />
-        <meta name="article:section" content="Novel Chapter" />
-        <meta name="article:tag" content={`${novel.name}, Chapter ${chapterData.chapter}, ${novel.genre || 'Novel'}`} />
-        <meta property="og:type" content="article" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta httpEquiv="Content-Language" content="id" />
-        <meta name="language" content="Indonesian" />
-      </Head>
+    <>
+      <SEO 
+        title={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title} - Novel Indo`}
+        description={`Baca ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title} karya ${novel.author} secara online di Novel Indo.`}
+        image={novel.cover ?? '/images/default-cover.jpg'}
+        keywords={`${novel.name}, Chapter ${chapterData.chapter}, ${chapterData.title}, ${novel.author}, ${novel.genre || 'Novel'}, baca novel online`}
+        author={novel.author}
+        article={true}
+      />
+      
+      <JsonLd 
+        type="article" 
+        data={generateArticleData(
+          novel,
+          chapterData.title,
+          chapterData.chapter,
+          `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}/novel/${novel.url || novel.id}/chapter/${chapterData.chapter}`,
+          novel.created_at,
+          novel.updated_at
+        )}
+        id={`json-ld-article-${novel.id}-${chapterData.chapter}`}
+      />
+      
+      <JsonLd 
+        type="breadcrumb" 
+        data={generateBreadcrumbData([
+          { name: 'Home', url: '/' },
+          { name: novel.name, url: `/novel/${novel.url || novel.id}` },
+          { name: `Chapter ${chapterData.chapter}: ${chapterData.title}`, url: `/novel/${novel.url || novel.id}/chapter/${chapterData.chapter}` }
+        ])}
+        id={`json-ld-breadcrumb-${novel.id}-${chapterData.chapter}`}
+      />
+      
+      <Layout
+        isSettingsOpen={isSettingsOpen}
+        setIsSettingsOpen={setIsSettingsOpen}
+      >
+        <div className="fixed top-0 left-0 w-full h-1 bg-base-300 z-50">
+          <div 
+            className="h-full bg-primary transition-all duration-300 ease-out"
+            style={{ width: `${readingProgress}%` }}
+            role="progressbar"
+            aria-valuenow={Math.round(readingProgress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Reading progress"
+          ></div>
+        </div>
 
-      <div className="fixed top-0 left-0 w-full h-1 bg-base-300 z-50">
-        <div 
-          className="h-full bg-primary transition-all duration-300 ease-out"
-          style={{ width: `${readingProgress}%` }}
-          role="progressbar"
-          aria-valuenow={Math.round(readingProgress)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Reading progress"
-        ></div>
-      </div>
+        {/* Desktop navigation */}
+        <div className="mb-4 flex justify-between items-center md:block hidden">
+          <Link href={`/novel/${novel.url || novel.id}`} className="btn btn-ghost btn-md">
+            ← Back to Novel
+          </Link>
+        </div>
 
-      {/* Desktop navigation */}
-      <div className="mb-4 flex justify-between items-center md:block hidden">
-        <Link href={`/novel/${novel.id}`} className="btn btn-ghost btn-md">
-          ← Back to Novel
-        </Link>
-      </div>
+        <div className="card bg-base-100 shadow-xl mb-4 md:mb-6">
+          <div className="card-body p-3 md:p-6">
+            
+            <div className="flex">
+              {renderChapterContent()}
 
-      <div className="card bg-base-100 shadow-xl mb-4 md:mb-6">
-        <div className="card-body p-3 md:p-6">
-          
-          <div className="flex">
-            {renderChapterContent()}
+              {/* Desktop sidebar */}
+              {!isMobile && (
+                <div className="w-12 flex-none">
+                  <div className="fixed flex flex-col gap-2 p-2 bg-base-200 rounded-l-xl shadow-lg right-0">
+                    <div className="space-y-2">
+                      {prevChapter ? (
+                        <Link 
+                          href={`/novel/${novel.url || novel.id}/chapter/${prevChapter}`}
+                          className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
+                          aria-label="Previous chapter"
+                          title="Previous Chapter"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                          </svg>
+                        </Link>
+                      ) : (
+                        <button className="btn btn-circle btn-sm btn-ghost opacity-50" disabled title="No Previous Chapter">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
 
-            {/* Desktop sidebar */}
-            {!isMobile && (
-              <div className="w-12 flex-none">
-                <div className="fixed flex flex-col gap-2 p-2 bg-base-200 rounded-l-xl shadow-lg right-0">
-                  <div className="space-y-2">
-                    {prevChapter ? (
+                    <div className="divider my-0"></div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
                       <Link 
-                        href={`/novel/${novel.id}/chapter/${prevChapter}`}
+                        href={`/novel/${novel.url || novel.id}`}
                         className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
-                        aria-label="Previous chapter"
-                        title="Previous Chapter"
+                        aria-label="Back to novel"
+                        title="Back to Novel"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
                         </svg>
                       </Link>
-                    ) : (
-                      <button className="btn btn-circle btn-sm btn-ghost opacity-50" disabled title="No Previous Chapter">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+                      </div>
 
-                  <div className="divider my-0"></div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                    <Link 
-                      href={`/novel/${novel.id}`}
-                      className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
-                      aria-label="Back to novel"
-                      title="Back to Novel"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-                      </svg>
-                    </Link>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                    <button 
-                      onClick={() => setShowChapterList(true)}
-                      className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
-                      aria-label="Show chapter list"
-                      title="Chapter List"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                      </svg>
-                    </button>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                    <button 
-                      onClick={() => setIsSettingsOpen(true)}
-                      className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
-                      aria-label="Open settings"
-                      title="Settings"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </button>
-                    </div>
-                  </div>
-
-                  <div className="divider my-0"></div>
-
-                  <div className="space-y-2">
-                    {nextChapter ? (
-                      <Link 
-                        href={`/novel/${novel.id}/chapter/${nextChapter}`}
+                      <div className="flex justify-between items-center">
+                      <button 
+                        onClick={() => setShowChapterList(true)}
                         className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
-                        aria-label="Next chapter"
-                        title="Next Chapter"
+                        aria-label="Show chapter list"
+                        title="Chapter List"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                      </Link>
-                    ) : (
-                      <button className="btn btn-circle btn-sm btn-ghost opacity-50" disabled title="No Next Chapter">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                         </svg>
                       </button>
-                    )}
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                      <button 
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
+                        aria-label="Open settings"
+                        title="Settings"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </button>
+                      </div>
+                    </div>
+
+                    <div className="divider my-0"></div>
+
+                    <div className="space-y-2">
+                      {nextChapter ? (
+                        <Link 
+                          href={`/novel/${novel.url || novel.id}/chapter/${nextChapter}`}
+                          className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
+                          aria-label="Next chapter"
+                          title="Next Chapter"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </Link>
+                      ) : (
+                        <button className="btn btn-circle btn-sm btn-ghost opacity-50" disabled title="No Next Chapter">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Mobile bottom navigation bar */}
-      {isMobile && (
-        <div className="btm-nav btm-nav-sm fixed bottom-0 z-50 bg-base-100 border-t border-base-300 shadow-lg">
-          {prevChapter ? (
+        {/* Mobile bottom navigation bar */}
+        {isMobile && (
+          <div className="btm-nav btm-nav-sm fixed bottom-0 z-50 bg-base-100 border-t border-base-300 shadow-lg">
+            {prevChapter ? (
+              <Link 
+                href={`/novel/${novel.url || novel.id}/chapter/${prevChapter}`}
+                className="text-base-content"
+                aria-label="Previous chapter"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+                <span className="btm-nav-label text-xs">Prev</span>
+              </Link>
+            ) : (
+              <button className="text-base-content opacity-50" disabled aria-label="No previous chapter">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+                <span className="btm-nav-label text-xs">Prev</span>
+              </button>
+            )}
+            
             <Link 
-              href={`/novel/${novel.id}/chapter/${prevChapter}`}
+              href={`/novel/${novel.url || novel.id}`}
               className="text-base-content"
-              aria-label="Previous chapter"
+              aria-label="Back to novel"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
               </svg>
-              <span className="btm-nav-label text-xs">Prev</span>
+              <span className="btm-nav-label text-xs">Novel</span>
             </Link>
-          ) : (
-            <button className="text-base-content opacity-50" disabled aria-label="No previous chapter">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-              <span className="btm-nav-label text-xs">Prev</span>
-            </button>
-          )}
-          
-          <Link 
-            href={`/novel/${novel.id}`}
-            className="text-base-content"
-            aria-label="Back to novel"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-            </svg>
-            <span className="btm-nav-label text-xs">Novel</span>
-          </Link>
-          
-          <button 
-            onClick={() => setShowChapterList(true)}
-            className="text-base-content"
-            aria-label="Show chapter list"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-            </svg>
-            <span className="btm-nav-label text-xs">Chapters</span>
-          </button>
-          
-          <button 
-            onClick={() => setIsSettingsOpen(true)}
-            className="text-base-content"
-            aria-label="Open settings"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className="btm-nav-label text-xs">Settings</span>
-          </button>
-          
-          {nextChapter ? (
-            <Link 
-              href={`/novel/${novel.id}/chapter/${nextChapter}`}
+            
+            <button 
+              onClick={() => setShowChapterList(true)}
               className="text-base-content"
-              aria-label="Next chapter"
+              aria-label="Show chapter list"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
               </svg>
-              <span className="btm-nav-label text-xs">Next</span>
-            </Link>
-          ) : (
-            <button className="text-base-content opacity-50" disabled aria-label="No next chapter">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
-              <span className="btm-nav-label text-xs">Next</span>
+              <span className="btm-nav-label text-xs">Chapters</span>
             </button>
-          )}
-        </div>
-      )}
+            
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className="text-base-content"
+              aria-label="Open settings"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="btm-nav-label text-xs">Settings</span>
+            </button>
+            
+            {nextChapter ? (
+              <Link 
+                href={`/novel/${novel.url || novel.id}/chapter/${nextChapter}`}
+                className="text-base-content"
+                aria-label="Next chapter"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+                <span className="btm-nav-label text-xs">Next</span>
+              </Link>
+            ) : (
+              <button className="text-base-content opacity-50" disabled aria-label="No next chapter">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+                <span className="btm-nav-label text-xs">Next</span>
+              </button>
+            )}
+          </div>
+        )}
 
-      {/* Chapter list drawer */}
-      {renderChapterListModal()}
-
-      {/* Add structured data for better content detection */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'Article',
-            'headline': `${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title}`,
-            'author': {
-              '@type': 'Person',
-              'name': novel.author || 'Novel Indo'
-            },
-            'publisher': {
-              '@type': 'Organization',
-              'name': 'Novel Indo',
-              'logo': {
-                '@type': 'ImageObject',
-                'url': typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : ''
-              }
-            },
-            'mainEntityOfPage': {
-              '@type': 'WebPage',
-              '@id': typeof window !== 'undefined' ? `${window.location.href}` : ''
-            },
-            'articleBody': chapterData.text
-          })
-        }}
-      />
-    </Layout>
+        {/* Chapter list drawer */}
+        {renderChapterListModal()}
+      </Layout>
+    </>
   );
 }

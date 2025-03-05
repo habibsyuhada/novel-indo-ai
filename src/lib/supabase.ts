@@ -29,6 +29,7 @@ export type Novel = {
   year: string;
   publishers: string | null;
   cover: string | null;
+  url: string | null;
   created_at: string;
   updated_at: string;
 };

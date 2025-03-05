@@ -10,9 +10,12 @@ export default function NovelCard({ novel }: NovelCardProps) {
   // Format genre list
   const genres = novel.genre.split(';').filter(g => g.trim() !== '');
   const coverUrl = novel.cover ? getStorageUrl(novel.cover) : null;
+  
+  // Use URL if available, otherwise fallback to ID
+  const novelLink = novel.url ? `/novel/${novel.url}` : `/novel/${novel.id}`;
 
   return (
-    <Link href={`/novel/${novel.id}`} className="card bg-base-100 hover:shadow-xl transition-shadow duration-200">
+    <Link href={novelLink} className="card bg-base-100 hover:shadow-xl transition-shadow duration-200">
       <figure className="relative aspect-[3/4]">
         {coverUrl ? (
           <Image
