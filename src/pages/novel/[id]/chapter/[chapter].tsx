@@ -7,7 +7,7 @@ import SEO from '../../../../components/SEO';
 import JsonLd, { generateArticleData, generateBreadcrumbData } from '../../../../components/JsonLd';
 import { trackChapterView } from '../../../../lib/gtm';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../../../../store/store';
+import { RootState, store } from '../../../../store/store';
 import { toggleSettings } from '../../../../store/settingsSlice';
 import { 
   ChevronLeft, 
@@ -18,7 +18,10 @@ import {
   X,
   ArrowLeft,
   ArrowRight,
-  BookOpen
+  BookOpen,
+  Play,
+  Pause,
+  StopCircle
 } from 'lucide-react';
 
 export default function ChapterPage() {
@@ -39,7 +42,14 @@ export default function ChapterPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const chaptersPerPage = 100;
   const dispatch = useDispatch();
-  const { fontSize } = useSelector((state: RootState) => state.settings);
+  const { fontSize, ttsEnabled } = useSelector((state: RootState) => state.settings);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0);
+  const [currentText, setCurrentText] = useState<string>('');
+  const speechSynthesisRef = useRef<SpeechSynthesis | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const paragraphRefs = useRef<(HTMLParagraphElement | null)[]>([]);
 
   // Check if device is mobile
   useEffect(() => {
@@ -228,12 +238,204 @@ export default function ChapterPage() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [novel, chapterData, nextChapter, prevChapter, router]);
 
-  // Render chapter content with proper paragraph formatting
+  // Initialize speech synthesis
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      speechSynthesisRef.current = window.speechSynthesis;
+    }
+  }, []);
+
+  // Function to scroll to paragraph
+  const scrollToParagraph = useCallback((index: number) => {
+    if (paragraphRefs.current[index]) {
+      paragraphRefs.current[index]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  }, []);
+
+  // TTS Controls
+  const startSpeaking = useCallback((text: string, index: number) => {
+    if (!speechSynthesisRef.current) return;
+
+    // Cancel any ongoing speech
+    speechSynthesisRef.current.cancel();
+
+    // Split long text into smaller chunks (around 200 characters each)
+    const chunks = text.match(/.{1,200}(?=\s|$)/g) || [text];
+    let currentChunkIndex = 0;
+
+    const speakNextChunk = () => {
+      if (currentChunkIndex < chunks.length) {
+        const utterance = new SpeechSynthesisUtterance(chunks[currentChunkIndex].trim());
+        utteranceRef.current = utterance;
+
+        // Get settings from Redux store
+        const { ttsRate, ttsPitch, ttsVoice } = store.getState().settings;
+
+        // Set voice if specified
+        if (ttsVoice) {
+          const voices = speechSynthesisRef.current?.getVoices() || [];
+          const selectedVoice = voices.find(voice => voice.voiceURI === ttsVoice);
+          if (selectedVoice) {
+            utterance.voice = selectedVoice;
+          }
+        } else {
+          // Try to set Indonesian voice as fallback
+          const voices = speechSynthesisRef.current?.getVoices() || [];
+          const indonesianVoice = voices.find(voice => voice.lang.includes('id'));
+          if (indonesianVoice) {
+            utterance.voice = indonesianVoice;
+          }
+        }
+
+        // Configure utterance with settings
+        utterance.rate = ttsRate;
+        utterance.pitch = ttsPitch;
+
+        // Handle utterance events
+        utterance.onstart = () => {
+          if (currentChunkIndex === 0) {
+            setIsPlaying(true);
+            setIsPaused(false);
+            setCurrentText(text);
+            scrollToParagraph(index);
+          }
+        };
+
+        utterance.onend = () => {
+          currentChunkIndex++;
+          if (currentChunkIndex < chunks.length) {
+            speakNextChunk();
+          } else if (chapterData) {
+            const paragraphs = chapterData.text.split('\n').filter(p => p.trim() !== '');
+            if (index < paragraphs.length - 1) {
+              setCurrentParagraphIndex(index + 1);
+              startSpeaking(paragraphs[index + 1], index + 1);
+            } else {
+              setIsPlaying(false);
+              setIsPaused(false);
+              setCurrentParagraphIndex(0);
+              setCurrentText('');
+            }
+          }
+        };
+
+        utterance.onpause = () => {
+          setIsPaused(true);
+          setIsPlaying(false);
+        };
+
+        utterance.onresume = () => {
+          setIsPaused(false);
+          setIsPlaying(true);
+        };
+
+        utterance.onerror = (event) => {
+          console.error('TTS Error:', event);
+          setIsPlaying(false);
+          setIsPaused(false);
+          setCurrentText('');
+        };
+
+        // Start speaking
+        if (speechSynthesisRef.current) {
+          speechSynthesisRef.current.speak(utterance);
+        }
+      }
+    };
+
+    // Start the chain of speech
+    speakNextChunk();
+    setCurrentParagraphIndex(index);
+  }, [chapterData, scrollToParagraph]);
+
+  const stopSpeaking = useCallback(() => {
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.cancel();
+      setIsPlaying(false);
+      setIsPaused(false);
+      setCurrentParagraphIndex(0);
+      setCurrentText('');
+    }
+  }, []);
+
+  const pauseSpeaking = useCallback(() => {
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.pause();
+      setIsPaused(true);
+      setIsPlaying(false);
+    }
+  }, []);
+
+  const resumeSpeaking = useCallback(() => {
+    if (speechSynthesisRef.current) {
+      if (currentText && isPaused) {
+        speechSynthesisRef.current.resume();
+        setIsPaused(false);
+        setIsPlaying(true);
+      } else if (chapterData) {
+        const paragraphs = chapterData.text.split('\n').filter(p => p.trim() !== '');
+        startSpeaking(paragraphs[currentParagraphIndex], currentParagraphIndex);
+      }
+    }
+  }, [chapterData, currentText, isPaused, currentParagraphIndex, startSpeaking]);
+
+  // Cleanup on unmount or chapter change
+  useEffect(() => {
+    return () => {
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current.cancel();
+        setIsPlaying(false);
+        setIsPaused(false);
+        setCurrentText('');
+      }
+    };
+  }, [chapter]);
+
+  // Render TTS controls
+  const renderTtsControls = () => {
+    if (!ttsEnabled) return null;
+
+    return (
+      <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-40">
+        <div className="bg-base-300 rounded-full shadow-lg px-4 py-2 flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (isPlaying) {
+                pauseSpeaking();
+              } else {
+                resumeSpeaking();
+              }
+            }}
+            className="btn btn-circle btn-sm"
+            aria-label={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+          </button>
+
+          <button
+            onClick={stopSpeaking}
+            className="btn btn-circle btn-sm"
+            aria-label="Stop"
+          >
+            <StopCircle className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Modify renderChapterContent to highlight current paragraph
   const renderChapterContent = () => {
     if (!chapterData || !novel) return null;
     
     // Split text into paragraphs
     const paragraphs = chapterData.text.split('\n').filter(p => p.trim() !== '');
+    
+    // Reset paragraph refs array
+    paragraphRefs.current = new Array(paragraphs.length).fill(null);
     
     return (
       <article 
@@ -260,8 +462,17 @@ export default function ChapterPage() {
           {paragraphs.map((paragraph: string, index: number) => (
             <p 
               key={index}
-              className="mb-4"
+              ref={(el: HTMLParagraphElement | null) => {
+                paragraphRefs.current[index] = el;
+              }}
+              className={`mb-4 ${ttsEnabled && currentParagraphIndex === index && isPlaying ? 'bg-primary/50 transition-colors duration-200' : ''} ${ttsEnabled && isPlaying ? 'cursor-pointer hover:bg-primary/10' : ''}`}
               tabIndex={0}
+              onClick={() => {
+                if (ttsEnabled && isPlaying && index !== currentParagraphIndex) {
+                  startSpeaking(paragraph, index);
+                }
+              }}
+              title={ttsEnabled && isPlaying ? "Click to jump to this paragraph" : ""}
             >
               {paragraph}
             </p>
@@ -569,6 +780,9 @@ export default function ChapterPage() {
           </div>
         </div>
       </div>
+
+      {/* TTS Controls */}
+      {renderTtsControls()}
 
       {/* Mobile bottom navigation bar */}
       {isMobile && (
