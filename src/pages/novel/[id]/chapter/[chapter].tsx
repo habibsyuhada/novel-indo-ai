@@ -50,6 +50,7 @@ export default function ChapterPage() {
   const speechSynthesisRef = useRef<SpeechSynthesis | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const paragraphRefs = useRef<(HTMLParagraphElement | null)[]>([]);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   // Check if device is mobile
   useEffect(() => {
@@ -255,9 +256,40 @@ export default function ChapterPage() {
     }
   }, []);
 
-  // TTS Controls
+  // Request wake lock
+  const requestWakeLock = async () => {
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        console.log('Wake Lock is active');
+      } catch (err) {
+        console.log(`Wake Lock error: ${err}`);
+      }
+    }
+  };
+
+  // Release wake lock
+  const releaseWakeLock = () => {
+    if (wakeLockRef.current) {
+      wakeLockRef.current.release()
+        .then(() => {
+          wakeLockRef.current = null;
+          console.log('Wake Lock released');
+        })
+        .catch((err) => {
+          console.log(`Wake Lock release error: ${err}`);
+        });
+    }
+  };
+
+  // Update startSpeaking to include wake lock
   const startSpeaking = useCallback((text: string, index: number) => {
     if (!speechSynthesisRef.current) return;
+
+    // Request wake lock when starting speech
+    if (isMobile) {
+      requestWakeLock();
+    }
 
     // Cancel any ongoing speech
     speechSynthesisRef.current.cancel();
@@ -349,8 +381,9 @@ export default function ChapterPage() {
     // Start the chain of speech
     speakNextChunk();
     setCurrentParagraphIndex(index);
-  }, [chapterData, scrollToParagraph]);
+  }, [chapterData, scrollToParagraph, isMobile]);
 
+  // Update stopSpeaking to release wake lock
   const stopSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.cancel();
@@ -358,20 +391,34 @@ export default function ChapterPage() {
       setIsPaused(false);
       setCurrentParagraphIndex(0);
       setCurrentText('');
+      
+      // Release wake lock when stopping
+      if (isMobile) {
+        releaseWakeLock();
+      }
     }
-  }, []);
+  }, [isMobile]);
 
   const pauseSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.pause();
       setIsPaused(true);
       setIsPlaying(false);
+
+      // Release wake lock when pausing
+      if (isMobile) {
+        releaseWakeLock();
+      }
     }
-  }, []);
+  }, [isMobile]);
 
   const resumeSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       if (currentText && isPaused) {
+        // Request wake lock when resuming
+        if (isMobile) {
+          requestWakeLock();
+        }
         speechSynthesisRef.current.resume();
         setIsPaused(false);
         setIsPlaying(true);
@@ -380,7 +427,7 @@ export default function ChapterPage() {
         startSpeaking(paragraphs[currentParagraphIndex], currentParagraphIndex);
       }
     }
-  }, [chapterData, currentText, isPaused, currentParagraphIndex, startSpeaking]);
+  }, [chapterData, currentText, isPaused, currentParagraphIndex, startSpeaking, isMobile]);
 
   // Cleanup on unmount or chapter change
   useEffect(() => {
@@ -390,9 +437,25 @@ export default function ChapterPage() {
         setIsPlaying(false);
         setIsPaused(false);
         setCurrentText('');
+        releaseWakeLock();
       }
     };
   }, [chapter]);
+
+  // Handle visibility change
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && isPlaying && isMobile) {
+        await requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseWakeLock(); // Release wake lock on unmount
+    };
+  }, [isPlaying, isMobile]);
 
   // Render TTS controls
   const renderTtsControls = () => {
