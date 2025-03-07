@@ -313,8 +313,8 @@ export default function ChapterPage() {
   const startSpeaking = useCallback((text: string, index: number) => {
     if (!speechSynthesisRef.current) return;
 
-    // Play silent audio to keep MediaSession active
-    audioRef.current?.play();
+    // Ensure audio is playing
+    audioRef.current?.play().catch(console.error);
 
     // Cancel any ongoing speech
     speechSynthesisRef.current.cancel();
@@ -434,7 +434,7 @@ export default function ChapterPage() {
   const resumeSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       if (currentText && isPaused) {
-        audioRef.current?.play();
+        audioRef.current?.play().catch(console.error);
         speechSynthesisRef.current.resume();
         setIsPaused(false);
         setIsPlaying(true);
@@ -448,52 +448,82 @@ export default function ChapterPage() {
     }
   }, [chapterData, currentText, isPaused, currentParagraphIndex, startSpeaking]);
 
-  // Setup MediaSession with audio element
+  // Initialize audio and MediaSession
   useEffect(() => {
-    if ('mediaSession' in navigator && audioRef.current) {
-      // Create silent audio
-      audioRef.current.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-      audioRef.current.loop = true;
+    const setupMediaSession = async () => {
+      if (!audioRef.current || !chapterData) return;
 
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: chapterData?.title || 'Reading Chapter',
-        artist: novel?.name || 'Novel Reading',
-        album: 'Text to Speech',
-        artwork: [
-          {
-            src: novel?.cover || '/images/default-cover.jpg',
-            sizes: '512x512',
-            type: 'image/jpeg'
-          }
-        ]
-      });
+      try {
+        // Create and load silent audio
+        const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+        silentAudio.loop = true;
+        silentAudio.volume = 0.1;
+        audioRef.current = silentAudio;
 
-      navigator.mediaSession.setActionHandler('play', () => {
-        if (!isPlaying) {
-          audioRef.current?.play();
-          resumeSpeaking();
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: `Chapter ${chapterData.chapter}: ${chapterData.title}`,
+            artist: novel?.name || 'Novel Reading',
+            album: 'Text to Speech',
+            artwork: [
+              { src: '/icons/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+              { src: '/icons/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' }
+            ]
+          });
+
+          // Set initial playback state
+          navigator.mediaSession.playbackState = 'none';
+
+          // Setup action handlers
+          navigator.mediaSession.setActionHandler('play', () => {
+            try {
+              if (!isPlaying) {
+                silentAudio.play().catch(console.error);
+                resumeSpeaking();
+              }
+            } catch (error) {
+              console.error('Play action error:', error);
+            }
+          });
+
+          navigator.mediaSession.setActionHandler('pause', () => {
+            try {
+              if (isPlaying) {
+                silentAudio.pause();
+                pauseSpeaking();
+              }
+            } catch (error) {
+              console.error('Pause action error:', error);
+            }
+          });
+
+          navigator.mediaSession.setActionHandler('stop', () => {
+            try {
+              silentAudio.pause();
+              stopSpeaking();
+            } catch (error) {
+              console.error('Stop action error:', error);
+            }
+          });
         }
-      });
+      } catch (error) {
+        console.error('Error setting up MediaSession:', error);
+      }
+    };
 
-      navigator.mediaSession.setActionHandler('pause', () => {
-        if (isPlaying) {
-          audioRef.current?.pause();
-          pauseSpeaking();
-        }
-      });
+    setupMediaSession();
 
-      navigator.mediaSession.setActionHandler('stop', () => {
-        audioRef.current?.pause();
-        stopSpeaking();
-      });
-
-      return () => {
-        // Clear handlers on cleanup
+    return () => {
+      if ('mediaSession' in navigator) {
         navigator.mediaSession.setActionHandler('play', null);
         navigator.mediaSession.setActionHandler('pause', null);
         navigator.mediaSession.setActionHandler('stop', null);
-      };
-    }
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
   }, [novel, chapterData, isPlaying, resumeSpeaking, pauseSpeaking, stopSpeaking]);
 
   // Cleanup on unmount or chapter change
@@ -773,9 +803,11 @@ export default function ChapterPage() {
     <>
       {/* Hidden audio element for MediaSession */}
       <audio 
-        ref={audioRef}
+        src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"
         style={{ display: 'none' }}
         playsInline
+        preload="auto"
+        loop
       />
 
       <SEO 
