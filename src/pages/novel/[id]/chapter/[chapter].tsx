@@ -282,14 +282,9 @@ export default function ChapterPage() {
     }
   };
 
-  // Update startSpeaking to include wake lock
+  // TTS Control Functions
   const startSpeaking = useCallback((text: string, index: number) => {
     if (!speechSynthesisRef.current) return;
-
-    // Request wake lock when starting speech
-    if (isMobile) {
-      requestWakeLock();
-    }
 
     // Cancel any ongoing speech
     speechSynthesisRef.current.cancel();
@@ -333,6 +328,11 @@ export default function ChapterPage() {
             setIsPaused(false);
             setCurrentText(text);
             scrollToParagraph(index);
+            
+            // Update MediaSession state
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'playing';
+            }
           }
         };
 
@@ -350,6 +350,10 @@ export default function ChapterPage() {
               setIsPaused(false);
               setCurrentParagraphIndex(0);
               setCurrentText('');
+              // Update MediaSession state
+              if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'none';
+              }
             }
           }
         };
@@ -357,11 +361,19 @@ export default function ChapterPage() {
         utterance.onpause = () => {
           setIsPaused(true);
           setIsPlaying(false);
+          // Update MediaSession state
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'paused';
+          }
         };
 
         utterance.onresume = () => {
           setIsPaused(false);
           setIsPlaying(true);
+          // Update MediaSession state
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+          }
         };
 
         utterance.onerror = (event) => {
@@ -369,6 +381,10 @@ export default function ChapterPage() {
           setIsPlaying(false);
           setIsPaused(false);
           setCurrentText('');
+          // Update MediaSession state
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'none';
+          }
         };
 
         // Start speaking
@@ -381,9 +397,8 @@ export default function ChapterPage() {
     // Start the chain of speech
     speakNextChunk();
     setCurrentParagraphIndex(index);
-  }, [chapterData, scrollToParagraph, isMobile]);
+  }, [chapterData, scrollToParagraph]);
 
-  // Update stopSpeaking to release wake lock
   const stopSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.cancel();
@@ -391,43 +406,79 @@ export default function ChapterPage() {
       setIsPaused(false);
       setCurrentParagraphIndex(0);
       setCurrentText('');
-      
-      // Release wake lock when stopping
-      if (isMobile) {
-        releaseWakeLock();
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'none';
       }
     }
-  }, [isMobile]);
+  }, []);
 
   const pauseSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.pause();
       setIsPaused(true);
       setIsPlaying(false);
-
-      // Release wake lock when pausing
-      if (isMobile) {
-        releaseWakeLock();
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
       }
     }
-  }, [isMobile]);
+  }, []);
 
   const resumeSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       if (currentText && isPaused) {
-        // Request wake lock when resuming
-        if (isMobile) {
-          requestWakeLock();
-        }
         speechSynthesisRef.current.resume();
         setIsPaused(false);
         setIsPlaying(true);
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = 'playing';
+        }
       } else if (chapterData) {
         const paragraphs = chapterData.text.split('\n').filter(p => p.trim() !== '');
         startSpeaking(paragraphs[currentParagraphIndex], currentParagraphIndex);
       }
     }
-  }, [chapterData, currentText, isPaused, currentParagraphIndex, startSpeaking, isMobile]);
+  }, [chapterData, currentText, isPaused, currentParagraphIndex, startSpeaking]);
+
+  // Setup MediaSession
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: chapterData?.title || 'Reading Chapter',
+        artist: novel?.name || 'Novel Reading',
+        album: 'Text to Speech',
+        artwork: [
+          {
+            src: novel?.cover || '/images/default-cover.jpg',
+            sizes: '512x512',
+            type: 'image/jpeg'
+          }
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (!isPlaying) {
+          resumeSpeaking();
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (isPlaying) {
+          pauseSpeaking();
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('stop', () => {
+        stopSpeaking();
+      });
+
+      return () => {
+        // Clear handlers on cleanup
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('stop', null);
+      };
+    }
+  }, [novel, chapterData, isPlaying, resumeSpeaking, pauseSpeaking, stopSpeaking]);
 
   // Cleanup on unmount or chapter change
   useEffect(() => {
