@@ -51,6 +51,7 @@ export default function ChapterPage() {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const paragraphRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Check if device is mobile
   useEffect(() => {
@@ -282,9 +283,38 @@ export default function ChapterPage() {
     }
   };
 
-  // TTS Control Functions
+  // Function declarations first
+  const stopSpeaking = useCallback(() => {
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.cancel();
+      setIsPlaying(false);
+      setIsPaused(false);
+      setCurrentParagraphIndex(0);
+      setCurrentText('');
+      audioRef.current?.pause();
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'none';
+      }
+    }
+  }, []);
+
+  const pauseSpeaking = useCallback(() => {
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.pause();
+      setIsPaused(true);
+      setIsPlaying(false);
+      audioRef.current?.pause();
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+    }
+  }, []);
+
   const startSpeaking = useCallback((text: string, index: number) => {
     if (!speechSynthesisRef.current) return;
+
+    // Play silent audio to keep MediaSession active
+    audioRef.current?.play();
 
     // Cancel any ongoing speech
     speechSynthesisRef.current.cancel();
@@ -350,6 +380,7 @@ export default function ChapterPage() {
               setIsPaused(false);
               setCurrentParagraphIndex(0);
               setCurrentText('');
+              audioRef.current?.pause();
               // Update MediaSession state
               if ('mediaSession' in navigator) {
                 navigator.mediaSession.playbackState = 'none';
@@ -381,6 +412,7 @@ export default function ChapterPage() {
           setIsPlaying(false);
           setIsPaused(false);
           setCurrentText('');
+          audioRef.current?.pause();
           // Update MediaSession state
           if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'none';
@@ -399,33 +431,10 @@ export default function ChapterPage() {
     setCurrentParagraphIndex(index);
   }, [chapterData, scrollToParagraph]);
 
-  const stopSpeaking = useCallback(() => {
-    if (speechSynthesisRef.current) {
-      speechSynthesisRef.current.cancel();
-      setIsPlaying(false);
-      setIsPaused(false);
-      setCurrentParagraphIndex(0);
-      setCurrentText('');
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'none';
-      }
-    }
-  }, []);
-
-  const pauseSpeaking = useCallback(() => {
-    if (speechSynthesisRef.current) {
-      speechSynthesisRef.current.pause();
-      setIsPaused(true);
-      setIsPlaying(false);
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'paused';
-      }
-    }
-  }, []);
-
   const resumeSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       if (currentText && isPaused) {
+        audioRef.current?.play();
         speechSynthesisRef.current.resume();
         setIsPaused(false);
         setIsPlaying(true);
@@ -439,9 +448,13 @@ export default function ChapterPage() {
     }
   }, [chapterData, currentText, isPaused, currentParagraphIndex, startSpeaking]);
 
-  // Setup MediaSession
+  // Setup MediaSession with audio element
   useEffect(() => {
-    if ('mediaSession' in navigator) {
+    if ('mediaSession' in navigator && audioRef.current) {
+      // Create silent audio
+      audioRef.current.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      audioRef.current.loop = true;
+
       navigator.mediaSession.metadata = new MediaMetadata({
         title: chapterData?.title || 'Reading Chapter',
         artist: novel?.name || 'Novel Reading',
@@ -457,17 +470,20 @@ export default function ChapterPage() {
 
       navigator.mediaSession.setActionHandler('play', () => {
         if (!isPlaying) {
+          audioRef.current?.play();
           resumeSpeaking();
         }
       });
 
       navigator.mediaSession.setActionHandler('pause', () => {
         if (isPlaying) {
+          audioRef.current?.pause();
           pauseSpeaking();
         }
       });
 
       navigator.mediaSession.setActionHandler('stop', () => {
+        audioRef.current?.pause();
         stopSpeaking();
       });
 
@@ -755,6 +771,13 @@ export default function ChapterPage() {
 
   return (
     <>
+      {/* Hidden audio element for MediaSession */}
+      <audio 
+        ref={audioRef}
+        style={{ display: 'none' }}
+        playsInline
+      />
+
       <SEO 
         title={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title} - Baca Novel Indo`}
         description={`Baca ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title} karya ${novel.author} secara online di Baca Novel Indo.`}
