@@ -52,6 +52,9 @@ export default function ChapterPage() {
   const paragraphRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [noSleep, setNoSleep] = useState<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   // Check if device is mobile
   useEffect(() => {
@@ -257,31 +260,48 @@ export default function ChapterPage() {
     }
   }, []);
 
-  // Request wake lock
+  // Request wake lock with better error handling and retry mechanism
   const requestWakeLock = async () => {
     if ('wakeLock' in navigator) {
       try {
+        // Release any existing wake lock first
+        if (wakeLockRef.current) {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+        }
+
+        // Request new wake lock
         wakeLockRef.current = await navigator.wakeLock.request('screen');
         console.log('Wake Lock is active');
       } catch (err) {
         console.log(`Wake Lock error: ${err}`);
+        // Retry after 1 second if failed
+        setTimeout(requestWakeLock, 1000);
       }
     }
   };
 
   // Release wake lock
-  const releaseWakeLock = () => {
+  const releaseWakeLock = useCallback(async () => {
     if (wakeLockRef.current) {
-      wakeLockRef.current.release()
-        .then(() => {
-          wakeLockRef.current = null;
-          console.log('Wake Lock released');
-        })
-        .catch((err) => {
-          console.log(`Wake Lock release error: ${err}`);
-        });
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('Wake Lock released');
+      } catch (err) {
+        console.log(`Wake Lock release error: ${err}`);
+      }
     }
-  };
+  }, []);
+
+  // Initialize NoSleep
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      import('nosleep.js').then((NoSleep) => {
+        setNoSleep(new NoSleep.default());
+      });
+    }
+  }, []);
 
   // Function declarations first
   const stopSpeaking = useCallback(() => {
@@ -295,8 +315,13 @@ export default function ChapterPage() {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'none';
       }
+      // Disable NoSleep
+      if (noSleep) {
+        noSleep.disable();
+        console.log('NoSleep disabled');
+      }
     }
-  }, []);
+  }, [noSleep]);
 
   const pauseSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
@@ -310,126 +335,194 @@ export default function ChapterPage() {
     }
   }, []);
 
+  // Initialize AudioContext
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'AudioContext' in window) {
+      audioContextRef.current = new AudioContext();
+    }
+    
+    return () => {
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.disconnect();
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  // Modified startSpeaking function
   const startSpeaking = useCallback((text: string, index: number) => {
     if (!speechSynthesisRef.current) return;
 
-    // Ensure audio is playing
-    audioRef.current?.play().catch(console.error);
+    // Enable NoSleep
+    if (noSleep) {
+      noSleep.enable();
+      console.log('NoSleep enabled');
+    }
 
-    // Cancel any ongoing speech
-    speechSynthesisRef.current.cancel();
+    // Request wake lock when starting speech
+    requestWakeLock();
 
-    // Split long text into smaller chunks (around 200 characters each)
-    const chunks = text.match(/.{1,200}(?=\s|$)/g) || [text];
-    let currentChunkIndex = 0;
-
-    const speakNextChunk = () => {
-      if (currentChunkIndex < chunks.length) {
-        const utterance = new SpeechSynthesisUtterance(chunks[currentChunkIndex].trim());
-        utteranceRef.current = utterance;
-
-        // Get settings from Redux store
-        const { ttsRate, ttsPitch, ttsVoice } = store.getState().settings;
-
-        // Set voice if specified
-        if (ttsVoice) {
-          const voices = speechSynthesisRef.current?.getVoices() || [];
-          const selectedVoice = voices.find(voice => voice.voiceURI === ttsVoice);
-          if (selectedVoice) {
-            utterance.voice = selectedVoice;
-          }
-        } else {
-          // Try to set Indonesian voice as fallback
-          const voices = speechSynthesisRef.current?.getVoices() || [];
-          const indonesianVoice = voices.find(voice => voice.lang.includes('id'));
-          if (indonesianVoice) {
-            utterance.voice = indonesianVoice;
-          }
-        }
-
-        // Configure utterance with settings
-        utterance.rate = ttsRate;
-        utterance.pitch = ttsPitch;
-
-        // Handle utterance events
-        utterance.onstart = () => {
-          if (currentChunkIndex === 0) {
-            setIsPlaying(true);
-            setIsPaused(false);
-            setCurrentText(text);
-            scrollToParagraph(index);
-            
-            // Update MediaSession state
-            if ('mediaSession' in navigator) {
-              navigator.mediaSession.playbackState = 'playing';
+    // Try to start audio playback first
+    const startAudio = async () => {
+      if (audioRef.current) {
+        try {
+          // Make sure audio is ready to play
+          audioRef.current.currentTime = 0;
+          
+          // Set up AudioContext only if not already connected
+          if (audioContextRef.current && !sourceNodeRef.current) {
+            try {
+              sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
+              sourceNodeRef.current.connect(audioContextRef.current.destination);
+              console.log('Audio source connected successfully');
+            } catch (err) {
+              console.warn('Audio source connection error:', err);
+              // Continue even if audio context fails
             }
           }
-        };
-
-        utterance.onend = () => {
-          currentChunkIndex++;
-          if (currentChunkIndex < chunks.length) {
-            speakNextChunk();
-          } else if (chapterData) {
-            const paragraphs = chapterData.text.split('\n').filter(p => p.trim() !== '');
-            if (index < paragraphs.length - 1) {
-              setCurrentParagraphIndex(index + 1);
-              startSpeaking(paragraphs[index + 1], index + 1);
-            } else {
-              setIsPlaying(false);
-              setIsPaused(false);
-              setCurrentParagraphIndex(0);
-              setCurrentText('');
-              audioRef.current?.pause();
-              // Update MediaSession state
-              if ('mediaSession' in navigator) {
-                navigator.mediaSession.playbackState = 'none';
-              }
-            }
-          }
-        };
-
-        utterance.onpause = () => {
-          setIsPaused(true);
-          setIsPlaying(false);
-          // Update MediaSession state
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'paused';
-          }
-        };
-
-        utterance.onresume = () => {
-          setIsPaused(false);
-          setIsPlaying(true);
-          // Update MediaSession state
+          
+          await audioRef.current.play();
+          console.log('Audio playing successfully for TTS');
+          
+          // Set audio session for background playback
           if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'playing';
+            
+            // Add position state if supported
+            if ('setPositionState' in navigator.mediaSession) {
+              navigator.mediaSession.setPositionState({
+                duration: 3600,
+                playbackRate: 1,
+                position: 0
+              });
+            }
           }
-        };
-
-        utterance.onerror = (event) => {
-          console.error('TTS Error:', event);
-          setIsPlaying(false);
-          setIsPaused(false);
-          setCurrentText('');
-          audioRef.current?.pause();
-          // Update MediaSession state
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'none';
-          }
-        };
-
-        // Start speaking
-        if (speechSynthesisRef.current) {
-          speechSynthesisRef.current.speak(utterance);
+        } catch (err) {
+          console.error('Failed to play audio for TTS:', err);
         }
       }
     };
 
-    // Start the chain of speech
-    speakNextChunk();
-    setCurrentParagraphIndex(index);
-  }, [chapterData, scrollToParagraph]);
+    // Start audio and TTS
+    startAudio().then(() => {
+      // Cancel any ongoing speech
+      speechSynthesisRef.current?.cancel();
+      
+      // Continue with TTS logic
+      // Split long text into smaller chunks (around 200 characters each)
+      const chunks = text.match(/.{1,200}(?=\s|$)/g) || [text];
+      let currentChunkIndex = 0;
+
+      const speakNextChunk = () => {
+        if (currentChunkIndex < chunks.length) {
+          const utterance = new SpeechSynthesisUtterance(chunks[currentChunkIndex].trim());
+          utteranceRef.current = utterance;
+
+          // Get settings from Redux store
+          const { ttsRate, ttsPitch, ttsVoice } = store.getState().settings;
+
+          // Set voice if specified
+          if (ttsVoice) {
+            const voices = speechSynthesisRef.current?.getVoices() || [];
+            const selectedVoice = voices.find(voice => voice.voiceURI === ttsVoice);
+            if (selectedVoice) {
+              utterance.voice = selectedVoice;
+            }
+          } else {
+            // Try to set Indonesian voice as fallback
+            const voices = speechSynthesisRef.current?.getVoices() || [];
+            const indonesianVoice = voices.find(voice => voice.lang.includes('id'));
+            if (indonesianVoice) {
+              utterance.voice = indonesianVoice;
+            }
+          }
+
+          // Configure utterance with settings
+          utterance.rate = ttsRate;
+          utterance.pitch = ttsPitch;
+
+          // Handle utterance events
+          utterance.onstart = () => {
+            if (currentChunkIndex === 0) {
+              setIsPlaying(true);
+              setIsPaused(false);
+              setCurrentText(text);
+              scrollToParagraph(index);
+              
+              // Update MediaSession state
+              if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'playing';
+              }
+            }
+          };
+
+          utterance.onend = () => {
+            currentChunkIndex++;
+            if (currentChunkIndex < chunks.length) {
+              speakNextChunk();
+            } else if (chapterData) {
+              const paragraphs = chapterData.text.split('\n').filter(p => p.trim() !== '');
+              if (index < paragraphs.length - 1) {
+                setCurrentParagraphIndex(index + 1);
+                startSpeaking(paragraphs[index + 1], index + 1);
+              } else {
+                setIsPlaying(false);
+                setIsPaused(false);
+                setCurrentParagraphIndex(0);
+                setCurrentText('');
+                audioRef.current?.pause();
+                // Update MediaSession state
+                if ('mediaSession' in navigator) {
+                  navigator.mediaSession.playbackState = 'none';
+                }
+              }
+            }
+          };
+
+          utterance.onpause = () => {
+            setIsPaused(true);
+            setIsPlaying(false);
+            // Update MediaSession state
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'paused';
+            }
+          };
+
+          utterance.onresume = () => {
+            setIsPaused(false);
+            setIsPlaying(true);
+            // Update MediaSession state
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'playing';
+            }
+          };
+
+          utterance.onerror = (event) => {
+            console.error('TTS Error:', event);
+            setIsPlaying(false);
+            setIsPaused(false);
+            setCurrentText('');
+            audioRef.current?.pause();
+            // Update MediaSession state
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'none';
+            }
+          };
+
+          // Start speaking
+          if (speechSynthesisRef.current) {
+            speechSynthesisRef.current.speak(utterance);
+          }
+        }
+      };
+
+      // Start the chain of speech
+      speakNextChunk();
+      setCurrentParagraphIndex(index);
+    });
+  }, [chapterData, scrollToParagraph, noSleep]);
 
   const resumeSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
@@ -448,19 +541,90 @@ export default function ChapterPage() {
     }
   }, [chapterData, currentText, isPaused, currentParagraphIndex, startSpeaking]);
 
+  // Handle visibility change
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && isPlaying && isMobile) {
+        await requestWakeLock();
+      } else if (document.visibilityState === 'hidden' && !isPlaying) {
+        await releaseWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseWakeLock(); // Release wake lock on unmount
+    };
+  }, [isPlaying, isMobile, releaseWakeLock]);
+
   // Initialize audio and MediaSession
   useEffect(() => {
     const setupMediaSession = async () => {
-      if (!audioRef.current || !chapterData) return;
+      if (!chapterData) return;
 
       try {
-        // Create and load silent audio
-        const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
-        silentAudio.loop = true;
-        silentAudio.volume = 0.1;
-        audioRef.current = silentAudio;
+        const audioElement = document.querySelector('#tts-audio-player') as HTMLAudioElement;
+        console.log('Audio element found:', !!audioElement);
+        
+        if (audioElement) {
+          audioElement.loop = true;
+          audioElement.volume = 0.1;
+          // Use a longer audio file for better background support
+          audioElement.src = '/audio/background.mp3'; // We'll create this file
+          audioRef.current = audioElement;
+          
+          // Enable audio to play in background
+          try {
+            // @ts-expect-error - Firefox specific
+            audioElement.mozAudioChannelType = 'content';
+            // @ts-expect-error - Safari/iOS specific
+            audioElement.webkitPreservesPitch = true;
+          } catch (e) {
+            console.warn('Browser specific audio properties not supported:', e);
+          }
+
+          // Set audio properties for background playback
+          audioElement.setAttribute('x-webkit-airplay', 'allow');
+          audioElement.setAttribute('x-webkit-playsinline', 'true');
+          audioElement.setAttribute('webkit-playsinline', 'true');
+          audioElement.setAttribute('x-webkit-background-playback', 'true');
+          audioElement.setAttribute('playsinline', '');
+          
+          // Add event listeners
+          audioElement.addEventListener('play', () => {
+            console.log('Audio started playing');
+            requestWakeLock(); // Request wake lock when audio starts
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'playing';
+            }
+          });
+          
+          audioElement.addEventListener('pause', () => {
+            console.log('Audio paused');
+            // Update MediaSession state when audio pauses
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'paused';
+            }
+          });
+          
+          audioElement.addEventListener('error', (e) => {
+            console.error('Audio error:', e);
+          });
+
+          // Try to load the audio
+          try {
+            await audioElement.load();
+            console.log('Audio loaded successfully');
+          } catch (err) {
+            console.error('Failed to load audio:', err);
+          }
+        }
 
         if ('mediaSession' in navigator) {
+          console.log('MediaSession API available');
+          
+          // Set metadata first
           navigator.mediaSession.metadata = new MediaMetadata({
             title: `Chapter ${chapterData.chapter}: ${chapterData.title}`,
             artist: novel?.name || 'Novel Reading',
@@ -471,14 +635,14 @@ export default function ChapterPage() {
             ]
           });
 
-          // Set initial playback state
-          navigator.mediaSession.playbackState = 'none';
-
-          // Setup action handlers
-          navigator.mediaSession.setActionHandler('play', () => {
+          // Set action handlers
+          navigator.mediaSession.setActionHandler('play', async () => {
             try {
-              if (!isPlaying) {
-                silentAudio.play().catch(console.error);
+              if (!isPlaying && audioRef.current) {
+                console.log('Play action triggered');
+                // Explicitly try to play audio first
+                await audioRef.current.play();
+                console.log('Audio started from media controls');
                 resumeSpeaking();
               }
             } catch (error) {
@@ -488,8 +652,9 @@ export default function ChapterPage() {
 
           navigator.mediaSession.setActionHandler('pause', () => {
             try {
-              if (isPlaying) {
-                silentAudio.pause();
+              console.log('Pause action triggered');
+              if (isPlaying && audioRef.current) {
+                audioRef.current.pause();
                 pauseSpeaking();
               }
             } catch (error) {
@@ -499,12 +664,21 @@ export default function ChapterPage() {
 
           navigator.mediaSession.setActionHandler('stop', () => {
             try {
-              silentAudio.pause();
-              stopSpeaking();
+              console.log('Stop action triggered');
+              if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+                stopSpeaking();
+              }
             } catch (error) {
               console.error('Stop action error:', error);
             }
           });
+
+          // Set initial state
+          navigator.mediaSession.playbackState = 'none';
+        } else {
+          console.log('MediaSession API not available');
         }
       } catch (error) {
         console.error('Error setting up MediaSession:', error);
@@ -513,46 +687,48 @@ export default function ChapterPage() {
 
     setupMediaSession();
 
+    // Cleanup
     return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       if ('mediaSession' in navigator) {
-        navigator.mediaSession.setActionHandler('play', null);
-        navigator.mediaSession.setActionHandler('pause', null);
-        navigator.mediaSession.setActionHandler('stop', null);
+        ['play', 'pause', 'stop'].forEach(action => {
+          try {
+            navigator.mediaSession.setActionHandler(action as MediaSessionAction, null);
+          } catch (e) {
+            console.warn(`Failed to remove ${action} handler:`, e);
+          }
+        });
+      }
+    };
+  }, [novel, chapterData, isPlaying, resumeSpeaking, pauseSpeaking, stopSpeaking]);
+
+  // Modified cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current.cancel();
+      }
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.disconnect();
+        sourceNodeRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
       }
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
+      setIsPlaying(false);
+      setIsPaused(false);
+      setCurrentText('');
+      releaseWakeLock();
     };
-  }, [novel, chapterData, isPlaying, resumeSpeaking, pauseSpeaking, stopSpeaking]);
-
-  // Cleanup on unmount or chapter change
-  useEffect(() => {
-    return () => {
-      if (speechSynthesisRef.current) {
-        speechSynthesisRef.current.cancel();
-        setIsPlaying(false);
-        setIsPaused(false);
-        setCurrentText('');
-        releaseWakeLock();
-      }
-    };
-  }, [chapter]);
-
-  // Handle visibility change
-  useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && isPlaying && isMobile) {
-        await requestWakeLock();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      releaseWakeLock(); // Release wake lock on unmount
-    };
-  }, [isPlaying, isMobile]);
+  }, [releaseWakeLock]);
 
   // Render TTS controls
   const renderTtsControls = () => {
@@ -801,13 +977,19 @@ export default function ChapterPage() {
 
   return (
     <>
-      {/* Hidden audio element for MediaSession */}
+      {/* Hidden audio element - updated for better background support */}
       <audio 
-        src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"
+        id="tts-audio-player"
+        src="/audio/background.mp3"
         style={{ display: 'none' }}
         playsInline
         preload="auto"
         loop
+        controls
+        x-webkit-airplay="allow"
+        x-webkit-playsinline="true"
+        webkit-playsinline="true"
+        x-webkit-background-playback="true"
       />
 
       <SEO 
