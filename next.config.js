@@ -14,7 +14,7 @@ const nextConfig = {
   headers: async () => {
     return [
       {
-        source: '/sw.js',
+        source: '/service-worker.js',
         headers: [
           {
             key: 'Cache-Control',
@@ -42,9 +42,15 @@ const nextConfig = {
             value: '1; mode=block',
           },
         ],
-      },
+      }
     ];
   },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.output.publicPath = '/_next/';
+    }
+    return config;
+  }
 };
 
-module.exports = nextConfig; 
+module.exports = nextConfig;

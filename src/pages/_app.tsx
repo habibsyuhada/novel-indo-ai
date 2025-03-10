@@ -15,19 +15,39 @@ function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
 
   useEffect(() => {
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker
-          .register('/service-worker.js')
-          .then((registration) => {
-            console.log('Service Worker registered:', registration);
-          })
-          .catch((error) => {
-            console.log('Service Worker registration failed:', error);
+    // Register service worker with better error handling and logging
+    const registerServiceWorker = async () => {
+      if ('serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.register('/service-worker.js', {
+            scope: '/'
           });
-      });
-    }
+          
+          console.log('Service Worker registration successful with scope:', registration.scope);
+          
+          registration.addEventListener('activate', (event) => {
+            console.log('Service Worker activated:', event);
+          });
+
+          registration.addEventListener('error', (error) => {
+            console.error('Service Worker error:', error);
+          });
+
+          // Check if service worker is active
+          if (registration.active) {
+            console.log('Service Worker is active');
+          }
+
+        } catch (error) {
+          console.error('Service Worker registration failed:', error);
+        }
+      } else {
+        console.log('Service Workers are not supported');
+      }
+    };
+
+    // Call the registration function
+    registerServiceWorker();
   }, []);
 
   useEffect(() => {
