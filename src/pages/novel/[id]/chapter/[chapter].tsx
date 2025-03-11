@@ -30,6 +30,7 @@ export default function ChapterPage() {
   const [contentElement, setContentElement] = useState<HTMLDivElement | null>(null);
   const [hasHandledAutoPlay, setHasHandledAutoPlay] = useState(false);
   const autoPlayHandledRef = useRef(false);
+  const [pendingAutoPlayTts, setPendingAutoPlayTts] = useState(false);
   
   // Redux
   const dispatch = useDispatch();
@@ -85,6 +86,28 @@ export default function ChapterPage() {
     hasNextChapter: !!nextChapter
   });
   
+  // Fungsi untuk memastikan data chapter yang benar untuk TTS
+  const verifyAndStartTts = useCallback((paragraphIndex: number = 0) => {
+    // Pastikan halaman tidak sedang loading dan data chapter sudah tersedia
+    if (loading) {
+      console.log('Halaman masih loading, menunda TTS start');
+      return;
+    }
+    
+    if (!chapterData || !paragraphs.length || paragraphs.length <= paragraphIndex) {
+      console.error('Invalid chapter data or paragraph index for TTS');
+      return;
+    }
+    
+    console.log(`Verified TTS for chapter ${chapterData.chapter}, starting at paragraph ${paragraphIndex}`);
+    startSpeaking(paragraphs[paragraphIndex], paragraphIndex);
+  }, [chapterData, paragraphs, startSpeaking, loading]);
+  
+  // Wrapper untuk menyesuaikan tipe parameter antara ChapterContent dan verifyAndStartTts
+  const handleParagraphClick = useCallback((text: string, index: number) => {
+    verifyAndStartTts(index);
+  }, [verifyAndStartTts]);
+  
   // Cancel auto-play
   const cancelAutoPlay = useCallback(() => {
     stopSpeaking();
@@ -100,9 +123,9 @@ export default function ChapterPage() {
     } else if (isPaused && currentText) {
       resumeSpeaking();
     } else if (paragraphs.length > 0) {
-      startSpeaking(paragraphs[currentParagraphIndex], currentParagraphIndex);
+      verifyAndStartTts(currentParagraphIndex);
     }
-  }, [isPlaying, isPaused, currentText, paragraphs, currentParagraphIndex, startSpeaking, pauseSpeaking, resumeSpeaking, isAutoPlaying]);
+  }, [isPlaying, isPaused, currentText, paragraphs, currentParagraphIndex, pauseSpeaking, resumeSpeaking, isAutoPlaying, verifyAndStartTts]);
   
   // Auto-start TTS when navigating to a new chapter via auto-play
   // Check if we came from a previous chapter via auto-play
@@ -112,18 +135,48 @@ export default function ChapterPage() {
     
     const fromAutoPlay = localStorage.getItem('fromAutoPlay') === 'true';
     
-    if (fromAutoPlay && ttsEnabled && chapterData && paragraphs.length > 0) {
+    if (fromAutoPlay && ttsEnabled) {
       // Clear the flag
       localStorage.removeItem('fromAutoPlay');
+      
+      if (loading || !chapterData || paragraphs.length === 0) {
+        // Jika masih loading, tandai bahwa kita perlu mulai TTS setelah loading selesai
+        console.log('Halaman masih loading, menandai auto-play pending');
+        setPendingAutoPlayTts(true);
+      } else if (chapterData && chapterData.chapter.toString() === (chapter as string)) {
+        // Mark as handled
+        setHasHandledAutoPlay(true);
+        autoPlayHandledRef.current = true;
+        setPendingAutoPlayTts(false);
+        
+        console.log(`Starting TTS for newly loaded chapter ${chapter}`);
+        // Start TTS immediately without delay
+        verifyAndStartTts(0);
+      } else {
+        console.log('Chapter data mismatch, waiting for correct data');
+      }
+    }
+  }, [chapterData, paragraphs, ttsEnabled, hasHandledAutoPlay, chapter, verifyAndStartTts, loading]);
+  
+  // Detect when loading completes and start TTS if pending
+  useEffect(() => {
+    // Periksa apakah loading baru saja selesai dan kita memiliki TTS pending
+    if (!loading && pendingAutoPlayTts && chapterData && paragraphs.length > 0) {
+      // Reset flag
+      setPendingAutoPlayTts(false);
       
       // Mark as handled
       setHasHandledAutoPlay(true);
       autoPlayHandledRef.current = true;
       
-      // Start TTS immediately without delay
-      startSpeaking(paragraphs[0], 0);
+      console.log(`Starting TTS after loading completed for chapter ${chapter}`);
+      // Gunakan delay yang lebih panjang untuk memastikan semua elemen sudah dirender
+      // dengan benar dan halaman sudah siap sepenuhnya
+      setTimeout(() => {
+        verifyAndStartTts(0);
+      }, 1000);
     }
-  }, [chapterData, paragraphs, ttsEnabled, startSpeaking, hasHandledAutoPlay]);
+  }, [loading, pendingAutoPlayTts, chapterData, paragraphs, chapter, verifyAndStartTts]);
   
   // Reset auto-play handled flag when chapter changes
   useEffect(() => {
@@ -185,62 +238,9 @@ export default function ChapterPage() {
   // Calculate total pages
   const totalPages = Math.ceil(totalChapters / chaptersPerPage);
   
-  // Special useEffect for auto-play that runs after loading is complete
-  useEffect(() => {
-    // Skip if already handled or if we're still loading
-    if (autoPlayHandledRef.current || loading || !chapterData) return;
-    
-    const fromAutoPlay = localStorage.getItem('fromAutoPlay') === 'true';
-    
-    if (fromAutoPlay && ttsEnabled && paragraphs.length > 0) {
-      console.log('Auto-play detected after loading completed');
-      // Clear the flag
-      localStorage.removeItem('fromAutoPlay');
-      
-      // Mark as handled
-      setHasHandledAutoPlay(true);
-      autoPlayHandledRef.current = true;
-      
-      // Start TTS immediately
-      startSpeaking(paragraphs[0], 0);
-    }
-  }, [loading, chapterData, ttsEnabled, paragraphs, startSpeaking]);
-  
-  // ComponentDidMount effect
-  useEffect(() => {
-    // Check for auto-play after component is fully mounted
-    if (chapterData && paragraphs.length > 0) {
-      const checkForAutoPlay = () => {
-        const fromAutoPlay = localStorage.getItem('fromAutoPlay') === 'true';
-        if (fromAutoPlay && ttsEnabled && !autoPlayHandledRef.current) {
-          // Clear the flag
-          localStorage.removeItem('fromAutoPlay');
-          
-          // Mark as handled
-          setHasHandledAutoPlay(true);
-          autoPlayHandledRef.current = true;
-          
-          // Start TTS
-          startSpeaking(paragraphs[0], 0);
-        }
-      };
-      
-      // Check immediately after initial render
-      checkForAutoPlay();
-      
-      // Also set up a custom event to check again after a short delay
-      // This helps with race conditions during page navigation
-      const autoplayCheckTimer = setTimeout(checkForAutoPlay, 500);
-      
-      return () => {
-        clearTimeout(autoplayCheckTimer);
-      };
-    }
-  }, [chapterData, paragraphs, ttsEnabled, startSpeaking]);
-  
   if (loading) {
     // Check if we're coming from auto-play
-    const fromAutoPlay = !autoPlayHandledRef.current && localStorage.getItem('fromAutoPlay') === 'true';
+    const fromAutoPlay = !autoPlayHandledRef.current && (localStorage.getItem('fromAutoPlay') === 'true' || pendingAutoPlayTts);
     
     // If we're loading via auto-play, show a more descriptive loading state
     if (fromAutoPlay) {
@@ -333,7 +333,7 @@ export default function ChapterPage() {
               ttsEnabled={ttsEnabled}
               currentParagraphIndex={currentParagraphIndex}
               isPlaying={isPlaying}
-              onParagraphClick={startSpeaking}
+              onParagraphClick={handleParagraphClick}
               onContentRef={setContentElement}
             />
             

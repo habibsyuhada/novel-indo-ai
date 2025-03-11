@@ -94,6 +94,54 @@ export const useTts = ({
     };
   }, [autoPlayTimer]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Pastikan speech synthesis dibatalkan saat komponen unmount
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current.cancel();
+      }
+      
+      // Pastikan autoplay timer dibersihkan
+      if (autoPlayTimer) {
+        clearTimeout(autoPlayTimer);
+      }
+      
+      // Pastikan NoSleep dimatikan
+      if (noSleep) {
+        noSleep.disable();
+      }
+      
+      // Reset semua state
+      setIsPlaying(false);
+      setIsPaused(false);
+      setIsAutoPlaying(false);
+      setCurrentText('');
+    };
+  }, [autoPlayTimer, noSleep]);
+
+  // Reset state when paragraphs change (chapter change)
+  useEffect(() => {
+    // Hanya reset jika paragraphs berubah dan tidak kosong (chapter baru)
+    if (paragraphs.length > 0) {
+      // Reset index dan state ketika paragraphs berubah (chapter baru)
+      setCurrentParagraphIndex(0);
+      setCurrentText('');
+      
+      // Pastikan speech synthesis dibersihkan
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current.cancel();
+      }
+      
+      // Pastikan auto-play state bersih
+      setIsPlaying(false);
+      setIsPaused(false);
+      setIsAutoPlaying(false);
+      
+      console.log(`TTS hook: New paragraphs loaded (${paragraphs.length}), reset state`);
+    }
+  }, [paragraphs]);
+
   // Function to update current paragraph index and notify parent component
   const updateCurrentParagraph = useCallback((index: number) => {
     // Update current paragraph index
@@ -150,6 +198,12 @@ export const useTts = ({
   const startSpeaking = useCallback((text: string, index: number) => {
     // Jangan mulai TTS jika sedang dalam status auto-play (countdown)
     if (!speechSynthesisRef.current || !enabled || isAutoPlaying) return;
+    
+    // Pastikan text tersedia
+    if (!text || text.trim() === '') {
+      console.error('Attempted to start TTS with empty text');
+      return;
+    }
 
     // Enable NoSleep when starting speech
     if (noSleep) {
@@ -161,6 +215,7 @@ export const useTts = ({
     
     // Split long text into smaller chunks (around 200 characters each)
     const chunks = text.match(/.{1,200}(?=\\s|$)/g) || [text];
+    console.log(`Starting TTS with text "${text.substring(0, 30)}..." at index ${index}`);
     let currentChunkIndex = 0;
 
     const speakNextChunk = () => {
