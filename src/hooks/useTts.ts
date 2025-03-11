@@ -5,6 +5,8 @@ export interface TtsHookProps {
   enabled: boolean;
   paragraphs: string[];
   onParagraphChange?: () => void;
+  onChapterEnd?: () => void;
+  hasNextChapter?: boolean;
 }
 
 export interface TtsHookReturn {
@@ -16,17 +18,22 @@ export interface TtsHookReturn {
   pauseSpeaking: () => void;
   resumeSpeaking: () => void;
   stopSpeaking: () => void;
+  isAutoPlaying: boolean;
 }
 
 export const useTts = ({ 
   enabled, 
   paragraphs, 
-  onParagraphChange 
+  onParagraphChange,
+  onChapterEnd,
+  hasNextChapter = false
 }: TtsHookProps): TtsHookReturn => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0);
   const [currentText, setCurrentText] = useState<string>('');
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [autoPlayTimer, setAutoPlayTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const speechSynthesisRef = useRef<SpeechSynthesis | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [noSleep, setNoSleep] = useState<any>(null);
@@ -78,6 +85,15 @@ export const useTts = ({
     };
   }, [isPlaying, isPaused, noSleep]);
 
+  // Clean up autoplay timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoPlayTimer) {
+        clearTimeout(autoPlayTimer);
+      }
+    };
+  }, [autoPlayTimer]);
+
   // Function to update current paragraph index and notify parent component
   const updateCurrentParagraph = useCallback((index: number) => {
     // Update current paragraph index
@@ -89,6 +105,37 @@ export const useTts = ({
       onParagraphChange();
     }
   }, [onParagraphChange]);
+
+  // Function to handle chapter end with autoplay
+  const handleChapterEnd = useCallback(() => {
+    const { ttsAutoPlay, ttsAutoPlayDelay } = store.getState().settings;
+    
+    // Clear any existing timer
+    if (autoPlayTimer) {
+      clearTimeout(autoPlayTimer);
+      setAutoPlayTimer(null);
+    }
+    
+    // Only proceed if autoplay is enabled and there is a next chapter
+    if (ttsAutoPlay && hasNextChapter && onChapterEnd) {
+      setIsAutoPlaying(true);
+      
+      // Ensure the flag is set before navigation
+      localStorage.setItem('fromAutoPlay', 'true');
+      
+      // Set timer to navigate after delay
+      const timer = setTimeout(() => {
+        setIsAutoPlaying(false);
+        
+        // Add small delay to ensure flag is set before navigation
+        setTimeout(() => {
+          onChapterEnd();
+        }, 50);
+      }, ttsAutoPlayDelay * 1000);
+      
+      setAutoPlayTimer(timer);
+    }
+  }, [autoPlayTimer, hasNextChapter, onChapterEnd]);
 
   // Function for starting speech
   const startSpeaking = useCallback((text: string, index: number) => {
@@ -163,6 +210,10 @@ export const useTts = ({
               setIsPaused(false);
               setCurrentParagraphIndex(0);
               setCurrentText('');
+              
+              // Handle auto-play to next chapter
+              handleChapterEnd();
+              
               // Disable NoSleep when TTS finishes
               if (noSleep) {
                 noSleep.disable();
@@ -206,7 +257,7 @@ export const useTts = ({
 
     speakNextChunk();
     setCurrentParagraphIndex(index);
-  }, [enabled, noSleep, paragraphs, updateCurrentParagraph]);
+  }, [enabled, noSleep, paragraphs, updateCurrentParagraph, handleChapterEnd]);
 
   const pauseSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
@@ -234,6 +285,7 @@ export const useTts = ({
     }
   }, [noSleep]);
 
+  // Cancel auto-play when manually stopping
   const stopSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.cancel();
@@ -241,12 +293,19 @@ export const useTts = ({
       setIsPlaying(false);
       setCurrentText('');
       
+      // Cancel auto-play if active
+      if (autoPlayTimer) {
+        clearTimeout(autoPlayTimer);
+        setAutoPlayTimer(null);
+        setIsAutoPlaying(false);
+      }
+      
       // Disable NoSleep when stopped
       if (noSleep) {
         noSleep.disable();
       }
     }
-  }, [noSleep]);
+  }, [noSleep, autoPlayTimer]);
 
   return {
     isPlaying,
@@ -256,7 +315,8 @@ export const useTts = ({
     startSpeaking,
     pauseSpeaking,
     resumeSpeaking,
-    stopSpeaking
+    stopSpeaking,
+    isAutoPlaying
   };
 };
 

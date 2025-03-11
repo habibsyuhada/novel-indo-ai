@@ -80,6 +80,9 @@ const ChapterContent = ({
         lang="id"
         className="mt-6"
       >
+				<p>
+					Chapter {chapterData.chapter}
+				</p>
         {paragraphs.map((paragraph: string, index: number) => (
           <p 
             key={index}

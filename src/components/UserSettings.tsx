@@ -10,7 +10,9 @@ import {
   setTtsVoice,
   setTtsAutoScroll,
   setTtsScrollPosition,
-  setTtsScrollBehavior
+  setTtsScrollBehavior,
+  setTtsAutoPlay,
+  setTtsAutoPlayDelay
 } from '../store/settingsSlice';
 import { X } from 'lucide-react';
 
@@ -32,7 +34,9 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
     ttsVoice,
     ttsAutoScroll,
     ttsScrollPosition,
-    ttsScrollBehavior
+    ttsScrollBehavior,
+    ttsAutoPlay,
+    ttsAutoPlayDelay
   } = useSelector((state: RootState) => state.settings);
 
   // Check if device is mobile
@@ -96,6 +100,16 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
       const savedTtsScrollBehavior = localStorage.getItem('ttsScrollBehavior');
       if (savedTtsScrollBehavior && (savedTtsScrollBehavior === 'smooth' || savedTtsScrollBehavior === 'auto')) {
         dispatch(setTtsScrollBehavior(savedTtsScrollBehavior));
+      }
+      
+      const savedTtsAutoPlay = localStorage.getItem('ttsAutoPlay');
+      if (savedTtsAutoPlay) {
+        dispatch(setTtsAutoPlay(savedTtsAutoPlay === 'true'));
+      }
+      
+      const savedTtsAutoPlayDelay = localStorage.getItem('ttsAutoPlayDelay');
+      if (savedTtsAutoPlayDelay) {
+        dispatch(setTtsAutoPlayDelay(parseInt(savedTtsAutoPlayDelay)));
       }
     }
   }, [dispatch]);
@@ -180,6 +194,18 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
   const handleTtsScrollBehaviorChange = (behavior: 'smooth' | 'auto') => {
     dispatch(setTtsScrollBehavior(behavior));
     localStorage.setItem('ttsScrollBehavior', behavior);
+  };
+
+  // Auto-play handlers
+  const toggleTtsAutoPlay = () => {
+    const newValue = !ttsAutoPlay;
+    dispatch(setTtsAutoPlay(newValue));
+    localStorage.setItem('ttsAutoPlay', newValue.toString());
+  };
+
+  const handleTtsAutoPlayDelayChange = (value: number) => {
+    dispatch(setTtsAutoPlayDelay(value));
+    localStorage.setItem('ttsAutoPlayDelay', value.toString());
   };
 
   if (!isOpen) return null;
@@ -420,6 +446,48 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                           <span>Auto</span>
                         </label>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* After auto-scroll settings */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-medium">Auto-Play Chapter Berikutnya</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span>Nonaktif</span>
+                    <input 
+                      type="checkbox" 
+                      className="toggle toggle-primary" 
+                      checked={ttsAutoPlay}
+                      onChange={toggleTtsAutoPlay}
+                      aria-label="Toggle auto-play next chapter"
+                    />
+                    <span>Aktif</span>
+                  </div>
+                </div>
+
+                {/* Auto-play delay - Only show when auto-play is enabled */}
+                {ttsAutoPlay && (
+                  <div className="form-control mt-2 pl-2">
+                    <label className="label">
+                      <span className="label-text font-medium">Delay sebelum pindah: {ttsAutoPlayDelay} detik</span>
+                    </label>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="10" 
+                      step="1"
+                      value={ttsAutoPlayDelay}
+                      onChange={(e) => handleTtsAutoPlayDelayChange(parseInt(e.target.value))}
+                      className="range range-primary range-sm" 
+                      aria-label="Auto-play delay"
+                    />
+                    <div className="flex justify-between text-xs mt-1">
+                      <span>1s</span>
+                      <span>5s</span>
+                      <span>10s</span>
                     </div>
                   </div>
                 )}

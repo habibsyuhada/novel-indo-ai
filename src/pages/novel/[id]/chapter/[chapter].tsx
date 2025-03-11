@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useDispatch, useSelector } from 'react-redux';
@@ -17,6 +17,7 @@ import ChapterContent from '../../../../components/chapter/ChapterContent';
 import ChapterList from '../../../../components/chapter/ChapterList';
 import Navigation from '../../../../components/chapter/Navigation';
 import TtsControls from '../../../../components/chapter/TtsControls';
+import AutoPlayCountdown from '../../../../components/chapter/AutoPlayCountdown';
 
 export default function ChapterPage() {
   const router = useRouter();
@@ -27,6 +28,8 @@ export default function ChapterPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [showChapterList, setShowChapterList] = useState(false);
   const [contentElement, setContentElement] = useState<HTMLDivElement | null>(null);
+  const [hasHandledAutoPlay, setHasHandledAutoPlay] = useState(false);
+  const autoPlayHandledRef = useRef(false);
   
   // Redux
   const dispatch = useDispatch();
@@ -51,6 +54,13 @@ export default function ChapterPage() {
   // TTS functionality
   const paragraphs = chapterData?.text.split('\n').filter(p => p.trim() !== '') || [];
   
+  // Handle chapter end for auto-play
+  const handleChapterEnd = useCallback(() => {
+    if (nextChapter && novel) {
+      router.push(`/novel/${novel.url || novel.id}/chapter/${nextChapter}`);
+    }
+  }, [nextChapter, novel, router]);
+  
   // handleParagraphChange is now a simple pass-through function
   // Auto-scroll is now handled in the ChapterContent component
   const handleParagraphChange = useCallback(() => {
@@ -65,12 +75,20 @@ export default function ChapterPage() {
     startSpeaking,
     pauseSpeaking,
     resumeSpeaking,
-    stopSpeaking
+    stopSpeaking,
+    isAutoPlaying
   } = useTts({ 
     enabled: ttsEnabled, 
     paragraphs,
-    onParagraphChange: handleParagraphChange
+    onParagraphChange: handleParagraphChange,
+    onChapterEnd: handleChapterEnd,
+    hasNextChapter: !!nextChapter
   });
+  
+  // Cancel auto-play
+  const cancelAutoPlay = useCallback(() => {
+    stopSpeaking();
+  }, [stopSpeaking]);
   
   // Handle play/pause button
   const handlePlayPause = useCallback(() => {
@@ -82,6 +100,43 @@ export default function ChapterPage() {
       startSpeaking(paragraphs[currentParagraphIndex], currentParagraphIndex);
     }
   }, [isPlaying, isPaused, currentText, paragraphs, currentParagraphIndex, startSpeaking, pauseSpeaking, resumeSpeaking]);
+  
+  // Auto-start TTS when navigating to a new chapter via auto-play
+  // Check if we came from a previous chapter via auto-play
+  useEffect(() => {
+    // Skip if we've already handled auto-play for this page load
+    if (autoPlayHandledRef.current) return;
+    
+    const fromAutoPlay = localStorage.getItem('fromAutoPlay') === 'true';
+    
+    if (fromAutoPlay && ttsEnabled && chapterData && paragraphs.length > 0) {
+      // Clear the flag
+      localStorage.removeItem('fromAutoPlay');
+      
+      // Mark as handled
+      setHasHandledAutoPlay(true);
+      autoPlayHandledRef.current = true;
+      
+      // Start TTS immediately without delay
+      startSpeaking(paragraphs[0], 0);
+    }
+  }, [chapterData, paragraphs, ttsEnabled, startSpeaking, hasHandledAutoPlay]);
+  
+  // Reset auto-play handled flag when chapter changes
+  useEffect(() => {
+    return () => {
+      autoPlayHandledRef.current = false;
+      setHasHandledAutoPlay(false);
+    };
+  }, [chapter]);
+  
+  // Set auto-play flag before navigation
+  useEffect(() => {
+    if (isAutoPlaying) {
+      // Gunakan localStorage sebagai pengganti sessionStorage untuk ketahanan
+      localStorage.setItem('fromAutoPlay', 'true');
+    }
+  }, [isAutoPlaying]);
   
   // Check if device is mobile
   useEffect(() => {
@@ -127,7 +182,73 @@ export default function ChapterPage() {
   // Calculate total pages
   const totalPages = Math.ceil(totalChapters / chaptersPerPage);
   
+  // Special useEffect for auto-play that runs after loading is complete
+  useEffect(() => {
+    // Skip if already handled or if we're still loading
+    if (autoPlayHandledRef.current || loading || !chapterData) return;
+    
+    const fromAutoPlay = localStorage.getItem('fromAutoPlay') === 'true';
+    
+    if (fromAutoPlay && ttsEnabled && paragraphs.length > 0) {
+      console.log('Auto-play detected after loading completed');
+      // Clear the flag
+      localStorage.removeItem('fromAutoPlay');
+      
+      // Mark as handled
+      setHasHandledAutoPlay(true);
+      autoPlayHandledRef.current = true;
+      
+      // Start TTS immediately
+      startSpeaking(paragraphs[0], 0);
+    }
+  }, [loading, chapterData, ttsEnabled, paragraphs, startSpeaking]);
+  
+  // ComponentDidMount effect
+  useEffect(() => {
+    // Check for auto-play after component is fully mounted
+    if (chapterData && paragraphs.length > 0) {
+      const checkForAutoPlay = () => {
+        const fromAutoPlay = localStorage.getItem('fromAutoPlay') === 'true';
+        if (fromAutoPlay && ttsEnabled && !autoPlayHandledRef.current) {
+          // Clear the flag
+          localStorage.removeItem('fromAutoPlay');
+          
+          // Mark as handled
+          setHasHandledAutoPlay(true);
+          autoPlayHandledRef.current = true;
+          
+          // Start TTS
+          startSpeaking(paragraphs[0], 0);
+        }
+      };
+      
+      // Check immediately after initial render
+      checkForAutoPlay();
+      
+      // Also set up a custom event to check again after a short delay
+      // This helps with race conditions during page navigation
+      const autoplayCheckTimer = setTimeout(checkForAutoPlay, 500);
+      
+      return () => {
+        clearTimeout(autoplayCheckTimer);
+      };
+    }
+  }, [chapterData, paragraphs, ttsEnabled, startSpeaking]);
+  
   if (loading) {
+    // Check if we're coming from auto-play
+    const fromAutoPlay = !autoPlayHandledRef.current && localStorage.getItem('fromAutoPlay') === 'true';
+    
+    // If we're loading via auto-play, show a more descriptive loading state
+    if (fromAutoPlay) {
+      return (
+        <div className="flex flex-col justify-center items-center min-h-[50vh] gap-2">
+          <span className="loading loading-spinner loading-lg"></span>
+          <p className="text-center">Memuat chapter berikutnya dan mempersiapkan TTS...</p>
+        </div>
+      );
+    }
+    
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
         <span className="loading loading-spinner loading-lg"></span>
@@ -234,6 +355,12 @@ export default function ChapterPage() {
         isPlaying={isPlaying}
         onPlayPause={handlePlayPause}
         onStop={stopSpeaking}
+      />
+
+      {/* Auto-play Countdown */}
+      <AutoPlayCountdown 
+        isActive={isAutoPlaying} 
+        onCancel={cancelAutoPlay} 
       />
 
       {/* Mobile navigation */}
