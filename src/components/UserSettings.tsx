@@ -453,7 +453,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                 {/* After auto-scroll settings */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-medium">Auto-Play Chapter Berikutnya</span>
+                    <span className="label-text font-medium">Auto-Play to Next Chapter</span>
                   </label>
                   <div className="flex items-center gap-2">
                     <span>Nonaktif</span>
@@ -472,7 +472,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                 {ttsAutoPlay && (
                   <div className="form-control mt-2 pl-2">
                     <label className="label">
-                      <span className="label-text font-medium">Delay sebelum pindah: {ttsAutoPlayDelay} detik</span>
+                      <span className="label-text font-medium">Delay: {ttsAutoPlayDelay} seconds</span>
                     </label>
                     <input 
                       type="range" 

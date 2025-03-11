@@ -92,6 +92,9 @@ export default function ChapterPage() {
   
   // Handle play/pause button
   const handlePlayPause = useCallback(() => {
+    // Jangan mulai TTS jika sedang dalam countdown auto-play
+    if (isAutoPlaying) return;
+    
     if (isPlaying) {
       pauseSpeaking();
     } else if (isPaused && currentText) {
@@ -99,7 +102,7 @@ export default function ChapterPage() {
     } else if (paragraphs.length > 0) {
       startSpeaking(paragraphs[currentParagraphIndex], currentParagraphIndex);
     }
-  }, [isPlaying, isPaused, currentText, paragraphs, currentParagraphIndex, startSpeaking, pauseSpeaking, resumeSpeaking]);
+  }, [isPlaying, isPaused, currentText, paragraphs, currentParagraphIndex, startSpeaking, pauseSpeaking, resumeSpeaking, isAutoPlaying]);
   
   // Auto-start TTS when navigating to a new chapter via auto-play
   // Check if we came from a previous chapter via auto-play

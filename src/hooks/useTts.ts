@@ -118,6 +118,15 @@ export const useTts = ({
     
     // Only proceed if autoplay is enabled and there is a next chapter
     if (ttsAutoPlay && hasNextChapter && onChapterEnd) {
+      // Pastikan TTS benar-benar berhenti
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current.cancel();
+        setIsPlaying(false);
+        setIsPaused(false);
+        setCurrentText('');
+      }
+      
+      // Aktifkan status autoplay (untuk menampilkan countdown)
       setIsAutoPlaying(true);
       
       // Ensure the flag is set before navigation
@@ -139,7 +148,8 @@ export const useTts = ({
 
   // Function for starting speech
   const startSpeaking = useCallback((text: string, index: number) => {
-    if (!speechSynthesisRef.current || !enabled) return;
+    // Jangan mulai TTS jika sedang dalam status auto-play (countdown)
+    if (!speechSynthesisRef.current || !enabled || isAutoPlaying) return;
 
     // Enable NoSleep when starting speech
     if (noSleep) {
@@ -212,11 +222,14 @@ export const useTts = ({
               setCurrentText('');
               
               // Handle auto-play to next chapter
-              handleChapterEnd();
-              
-              // Disable NoSleep when TTS finishes
-              if (noSleep) {
-                noSleep.disable();
+              // Pastikan TTS tidak dimulai ulang saat auto-play countdown sedang berjalan
+              if (hasNextChapter) {
+                handleChapterEnd();
+              } else {
+                // If there's no next chapter, just disable NoSleep
+                if (noSleep) {
+                  noSleep.disable();
+                }
               }
             }
           }
@@ -257,7 +270,7 @@ export const useTts = ({
 
     speakNextChunk();
     setCurrentParagraphIndex(index);
-  }, [enabled, noSleep, paragraphs, updateCurrentParagraph, handleChapterEnd]);
+  }, [enabled, noSleep, paragraphs, updateCurrentParagraph, handleChapterEnd, isAutoPlaying]);
 
   const pauseSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
