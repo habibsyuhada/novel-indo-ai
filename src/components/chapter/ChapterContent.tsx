@@ -35,6 +35,7 @@ const ChapterContent = ({
   
   // Split text into paragraphs
   const paragraphs = chapterData.text.split('\n').filter(p => p.trim() !== '');
+	localStorage.setItem('curchapter', chapterData.chapter.toString());
   
   // Pass content ref to parent
   useEffect(() => {

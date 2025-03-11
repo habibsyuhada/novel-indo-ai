@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
+import { NovelChapter } from '../../lib/supabase';
 
 interface AutoPlayCountdownProps {
   isActive: boolean;
   onCancel: () => void;
+	chapterData: NovelChapter;
 }
 
-const AutoPlayCountdown: React.FC<AutoPlayCountdownProps> = ({ isActive, onCancel }) => {
+const AutoPlayCountdown: React.FC<AutoPlayCountdownProps> = ({ isActive, onCancel, chapterData }) => {
   const { ttsAutoPlayDelay } = useSelector((state: RootState) => state.settings);
   const [countdown, setCountdown] = useState(ttsAutoPlayDelay);
 
@@ -19,7 +21,8 @@ const AutoPlayCountdown: React.FC<AutoPlayCountdownProps> = ({ isActive, onCance
 
     // Reset countdown when active changes
     setCountdown(ttsAutoPlayDelay);
-
+		console.log("set fromchapter", chapterData.chapter.toString())
+		localStorage.setItem('fromchapter', chapterData.chapter.toString());
     // Set up the countdown timer
     const timer = setInterval(() => {
       setCountdown((prev) => {

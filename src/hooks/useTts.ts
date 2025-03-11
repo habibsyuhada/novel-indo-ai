@@ -94,54 +94,6 @@ export const useTts = ({
     };
   }, [autoPlayTimer]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      // Pastikan speech synthesis dibatalkan saat komponen unmount
-      if (speechSynthesisRef.current) {
-        speechSynthesisRef.current.cancel();
-      }
-      
-      // Pastikan autoplay timer dibersihkan
-      if (autoPlayTimer) {
-        clearTimeout(autoPlayTimer);
-      }
-      
-      // Pastikan NoSleep dimatikan
-      if (noSleep) {
-        noSleep.disable();
-      }
-      
-      // Reset semua state
-      setIsPlaying(false);
-      setIsPaused(false);
-      setIsAutoPlaying(false);
-      setCurrentText('');
-    };
-  }, [autoPlayTimer, noSleep]);
-
-  // Reset state when paragraphs change (chapter change)
-  useEffect(() => {
-    // Hanya reset jika paragraphs berubah dan tidak kosong (chapter baru)
-    if (paragraphs.length > 0) {
-      // Reset index dan state ketika paragraphs berubah (chapter baru)
-      setCurrentParagraphIndex(0);
-      setCurrentText('');
-      
-      // Pastikan speech synthesis dibersihkan
-      if (speechSynthesisRef.current) {
-        speechSynthesisRef.current.cancel();
-      }
-      
-      // Pastikan auto-play state bersih
-      setIsPlaying(false);
-      setIsPaused(false);
-      setIsAutoPlaying(false);
-      
-      console.log(`TTS hook: New paragraphs loaded (${paragraphs.length}), reset state`);
-    }
-  }, [paragraphs]);
-
   // Function to update current paragraph index and notify parent component
   const updateCurrentParagraph = useCallback((index: number) => {
     // Update current paragraph index
@@ -158,22 +110,29 @@ export const useTts = ({
   const handleChapterEnd = useCallback(() => {
     const { ttsAutoPlay, ttsAutoPlayDelay } = store.getState().settings;
     
+    // Selalu bersihkan TTS saat akhir chapter
+    // Stop TTS completely
+    if (speechSynthesisRef.current) {
+      speechSynthesisRef.current.cancel();
+      setIsPlaying(false);
+      setIsPaused(false);
+      setCurrentText('');
+      setCurrentParagraphIndex(0);
+      
+      // Disable NoSleep
+      if (noSleep) {
+        noSleep.disable();
+      }
+    }
+    
     // Clear any existing timer
     if (autoPlayTimer) {
       clearTimeout(autoPlayTimer);
       setAutoPlayTimer(null);
     }
     
-    // Only proceed if autoplay is enabled and there is a next chapter
+    // Only proceed with auto-play if enabled and there is a next chapter
     if (ttsAutoPlay && hasNextChapter && onChapterEnd) {
-      // Pastikan TTS benar-benar berhenti
-      if (speechSynthesisRef.current) {
-        speechSynthesisRef.current.cancel();
-        setIsPlaying(false);
-        setIsPaused(false);
-        setCurrentText('');
-      }
-      
       // Aktifkan status autoplay (untuk menampilkan countdown)
       setIsAutoPlaying(true);
       
@@ -192,18 +151,12 @@ export const useTts = ({
       
       setAutoPlayTimer(timer);
     }
-  }, [autoPlayTimer, hasNextChapter, onChapterEnd]);
+  }, [autoPlayTimer, hasNextChapter, onChapterEnd, noSleep]);
 
   // Function for starting speech
   const startSpeaking = useCallback((text: string, index: number) => {
     // Jangan mulai TTS jika sedang dalam status auto-play (countdown)
     if (!speechSynthesisRef.current || !enabled || isAutoPlaying) return;
-    
-    // Pastikan text tersedia
-    if (!text || text.trim() === '') {
-      console.error('Attempted to start TTS with empty text');
-      return;
-    }
 
     // Enable NoSleep when starting speech
     if (noSleep) {
@@ -215,7 +168,6 @@ export const useTts = ({
     
     // Split long text into smaller chunks (around 200 characters each)
     const chunks = text.match(/.{1,200}(?=\\s|$)/g) || [text];
-    console.log(`Starting TTS with text "${text.substring(0, 30)}..." at index ${index}`);
     let currentChunkIndex = 0;
 
     const speakNextChunk = () => {
@@ -356,10 +308,16 @@ export const useTts = ({
   // Cancel auto-play when manually stopping
   const stopSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
+      // Batalkan speech synthesis yang sedang berjalan
       speechSynthesisRef.current.cancel();
+      
+      // Reset semua state
       setIsPaused(false);
       setIsPlaying(false);
       setCurrentText('');
+      
+      // Reset ke paragraf pertama
+      setCurrentParagraphIndex(0);
       
       // Cancel auto-play if active
       if (autoPlayTimer) {
