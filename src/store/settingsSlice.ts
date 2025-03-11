@@ -8,6 +8,9 @@ interface SettingsState {
   ttsRate: number;
   ttsPitch: number;
   ttsVoice: string;
+  ttsAutoScroll: boolean;
+  ttsScrollPosition: 'start' | 'center';
+  ttsScrollBehavior: 'smooth' | 'auto';
 }
 
 const initialState: SettingsState = {
@@ -17,7 +20,10 @@ const initialState: SettingsState = {
   ttsEnabled: false,
   ttsRate: 1,
   ttsPitch: 1,
-  ttsVoice: ''
+  ttsVoice: '',
+  ttsAutoScroll: true,
+  ttsScrollPosition: 'start',
+  ttsScrollBehavior: 'smooth'
 };
 
 const settingsSlice = createSlice({
@@ -44,6 +50,15 @@ const settingsSlice = createSlice({
     },
     setTtsVoice: (state, action: PayloadAction<string>) => {
       state.ttsVoice = action.payload;
+    },
+    setTtsAutoScroll: (state, action: PayloadAction<boolean>) => {
+      state.ttsAutoScroll = action.payload;
+    },
+    setTtsScrollPosition: (state, action: PayloadAction<'start' | 'center'>) => {
+      state.ttsScrollPosition = action.payload;
+    },
+    setTtsScrollBehavior: (state, action: PayloadAction<'smooth' | 'auto'>) => {
+      state.ttsScrollBehavior = action.payload;
     }
   }
 });
@@ -55,6 +70,9 @@ export const {
   setTtsEnabled,
   setTtsRate,
   setTtsPitch,
-  setTtsVoice
+  setTtsVoice,
+  setTtsAutoScroll,
+  setTtsScrollPosition,
+  setTtsScrollBehavior
 } = settingsSlice.actions;
 export default settingsSlice.reducer; 

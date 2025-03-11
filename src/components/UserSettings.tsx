@@ -7,7 +7,10 @@ import {
   setTtsEnabled, 
   setTtsRate,
   setTtsPitch,
-  setTtsVoice 
+  setTtsVoice,
+  setTtsAutoScroll,
+  setTtsScrollPosition,
+  setTtsScrollBehavior
 } from '../store/settingsSlice';
 import { X } from 'lucide-react';
 
@@ -26,7 +29,10 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
     ttsEnabled,
     ttsRate,
     ttsPitch,
-    ttsVoice 
+    ttsVoice,
+    ttsAutoScroll,
+    ttsScrollPosition,
+    ttsScrollBehavior
   } = useSelector((state: RootState) => state.settings);
 
   // Check if device is mobile
@@ -75,6 +81,21 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
       const savedTtsVoice = localStorage.getItem('ttsVoice');
       if (savedTtsVoice) {
         dispatch(setTtsVoice(savedTtsVoice));
+      }
+      
+      const savedTtsAutoScroll = localStorage.getItem('ttsAutoScroll');
+      if (savedTtsAutoScroll) {
+        dispatch(setTtsAutoScroll(savedTtsAutoScroll === 'true'));
+      }
+      
+      const savedTtsScrollPosition = localStorage.getItem('ttsScrollPosition');
+      if (savedTtsScrollPosition && (savedTtsScrollPosition === 'start' || savedTtsScrollPosition === 'center')) {
+        dispatch(setTtsScrollPosition(savedTtsScrollPosition));
+      }
+      
+      const savedTtsScrollBehavior = localStorage.getItem('ttsScrollBehavior');
+      if (savedTtsScrollBehavior && (savedTtsScrollBehavior === 'smooth' || savedTtsScrollBehavior === 'auto')) {
+        dispatch(setTtsScrollBehavior(savedTtsScrollBehavior));
       }
     }
   }, [dispatch]);
@@ -144,6 +165,23 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
     localStorage.setItem('ttsVoice', voiceUri);
   };
 
+  // Auto-scroll handlers
+  const toggleTtsAutoScroll = () => {
+    const newValue = !ttsAutoScroll;
+    dispatch(setTtsAutoScroll(newValue));
+    localStorage.setItem('ttsAutoScroll', newValue.toString());
+  };
+
+  const handleTtsScrollPositionChange = (position: 'start' | 'center') => {
+    dispatch(setTtsScrollPosition(position));
+    localStorage.setItem('ttsScrollPosition', position);
+  };
+
+  const handleTtsScrollBehaviorChange = (behavior: 'smooth' | 'auto') => {
+    dispatch(setTtsScrollBehavior(behavior));
+    localStorage.setItem('ttsScrollBehavior', behavior);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -154,7 +192,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
         <div className={`bg-base-100 h-full flex flex-col ${isMobile ? 'w-full' : 'w-[320px] shadow-xl'}`}>
           <div className="p-4 border-b border-base-300">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold">User Settings</h2>
+              <h2 className="text-xl font-bold">Pengaturan Pengguna</h2>
               <button 
                 onClick={onClose} 
                 className="btn btn-sm btn-circle"
@@ -228,7 +266,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                 <span className="label-text font-medium">Text-to-Speech</span>
               </label>
               <div className="flex items-center gap-2">
-                <span>Disabled</span>
+                <span>Nonaktif</span>
                 <input 
                   type="checkbox" 
                   className="toggle toggle-primary" 
@@ -236,7 +274,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                   onChange={toggleTts}
                   aria-label="Toggle text-to-speech"
                 />
-                <span>Enabled</span>
+                <span>Aktif</span>
               </div>
             </div>
 
@@ -306,6 +344,85 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                     <span>High</span>
                   </div>
                 </div>
+
+                {/* Auto-Scroll Settings */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-medium">Auto-scroll Text</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span>Nonaktif</span>
+                    <input 
+                      type="checkbox" 
+                      className="toggle toggle-primary" 
+                      checked={ttsAutoScroll}
+                      onChange={toggleTtsAutoScroll}
+                      aria-label="Toggle auto-scroll"
+                    />
+                    <span>Aktif</span>
+                  </div>
+                </div>
+
+                {/* Scroll Position - Only show when auto-scroll is enabled */}
+                {ttsAutoScroll && (
+                  <div className="space-y-2 mt-2 pl-2">
+                    <div className="form-control">
+                      <label className="label">
+                        <span className="label-text font-medium">Scroll Position</span>
+                      </label>
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            className="radio radio-sm radio-primary" 
+                            checked={ttsScrollPosition === 'start'}
+                            onChange={() => handleTtsScrollPositionChange('start')}
+                            name="scroll-position"
+                          />
+                          <span>Start</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            className="radio radio-sm radio-primary" 
+                            checked={ttsScrollPosition === 'center'}
+                            onChange={() => handleTtsScrollPositionChange('center')}
+                            name="scroll-position"
+                          />
+                          <span>Center</span>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <div className="form-control">
+                      <label className="label">
+                        <span className="label-text font-medium">Scroll Behavior</span>
+                      </label>
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            className="radio radio-sm radio-primary" 
+                            checked={ttsScrollBehavior === 'smooth'}
+                            onChange={() => handleTtsScrollBehaviorChange('smooth')}
+                            name="scroll-behavior"
+                          />
+                          <span>Smooth</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            className="radio radio-sm radio-primary" 
+                            checked={ttsScrollBehavior === 'auto'}
+                            onChange={() => handleTtsScrollBehaviorChange('auto')}
+                            name="scroll-behavior"
+                          />
+                          <span>Auto</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -316,7 +433,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
               className="btn btn-primary"
               aria-label="Save and close settings"
             >
-              Save & Close
+              Simpan & Tutup
             </button>
           </div>
         </div>

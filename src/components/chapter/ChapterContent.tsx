@@ -1,6 +1,8 @@
 import { useRef, useEffect } from 'react';
 import { Novel, NovelChapter } from '../../lib/supabase';
 import styles from '../../styles/chapter.module.css';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store/store';
 
 interface ChapterContentProps {
   novel: Novel;
@@ -26,6 +28,11 @@ const ChapterContent = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const paragraphRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   
+  // Get TTS auto-scroll settings from Redux
+  const { ttsAutoScroll, ttsScrollPosition, ttsScrollBehavior } = useSelector(
+    (state: RootState) => state.settings
+  );
+  
   // Split text into paragraphs
   const paragraphs = chapterData.text.split('\n').filter(p => p.trim() !== '');
   
@@ -40,6 +47,16 @@ const ChapterContent = ({
   useEffect(() => {
     paragraphRefs.current = new Array(paragraphs.length).fill(null);
   }, [paragraphs.length]);
+  
+  // Auto-scroll to current paragraph when TTS is playing
+  useEffect(() => {
+    if (ttsEnabled && isPlaying && ttsAutoScroll && paragraphRefs.current[currentParagraphIndex]) {
+      paragraphRefs.current[currentParagraphIndex]?.scrollIntoView({
+        behavior: ttsScrollBehavior,
+        block: ttsScrollPosition
+      });
+    }
+  }, [currentParagraphIndex, isPlaying, ttsEnabled, ttsAutoScroll, ttsScrollPosition, ttsScrollBehavior]);
   
   return (
     <article 
@@ -72,11 +89,11 @@ const ChapterContent = ({
             className={`mb-4 ${ttsEnabled && currentParagraphIndex === index && isPlaying ? 'bg-primary/50 transition-colors duration-200' : ''} ${ttsEnabled && isPlaying ? 'cursor-pointer hover:bg-primary/10' : ''}`}
             tabIndex={0}
             onClick={() => {
-              if (ttsEnabled && isPlaying && index !== currentParagraphIndex) {
+              if (ttsEnabled && index !== currentParagraphIndex) {
                 onParagraphClick(paragraph, index);
               }
             }}
-            title={ttsEnabled && isPlaying ? "Klik untuk mulai membaca dari paragraf ini" : ""}
+            title={ttsEnabled ? "Klik untuk mulai membaca dari paragraf ini" : ""}
           >
             {paragraph}
           </p>

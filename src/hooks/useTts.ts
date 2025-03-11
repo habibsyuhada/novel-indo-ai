@@ -4,7 +4,7 @@ import { store } from '../store/store';
 export interface TtsHookProps {
   enabled: boolean;
   paragraphs: string[];
-  onParagraphChange?: (index: number) => void;
+  onParagraphChange?: () => void;
 }
 
 export interface TtsHookReturn {
@@ -78,6 +78,18 @@ export const useTts = ({
     };
   }, [isPlaying, isPaused, noSleep]);
 
+  // Function to update current paragraph index and notify parent component
+  const updateCurrentParagraph = useCallback((index: number) => {
+    // Update current paragraph index
+    setCurrentParagraphIndex(index);
+    
+    // Notify parent component if callback is provided
+    // We just call the callback without arguments since Component handles the auto-scroll
+    if (onParagraphChange) {
+      onParagraphChange();
+    }
+  }, [onParagraphChange]);
+
   // Function for starting speech
   const startSpeaking = useCallback((text: string, index: number) => {
     if (!speechSynthesisRef.current || !enabled) return;
@@ -128,7 +140,7 @@ export const useTts = ({
             setIsPlaying(true);
             setIsPaused(false);
             setCurrentText(text);
-            onParagraphChange?.(index);
+            updateCurrentParagraph(index);
           }
         };
 
@@ -141,8 +153,8 @@ export const useTts = ({
             const nextIndex = index + 1;
             
             if (nextIndex < paragraphs.length) {
-              // Inform parent component to scroll to next paragraph
-              onParagraphChange?.(nextIndex);
+              // Scroll to next paragraph with settings
+              updateCurrentParagraph(nextIndex);
               // Speak next paragraph
               startSpeaking(paragraphs[nextIndex], nextIndex);
             } else {
@@ -194,7 +206,7 @@ export const useTts = ({
 
     speakNextChunk();
     setCurrentParagraphIndex(index);
-  }, [enabled, noSleep, paragraphs, onParagraphChange]);
+  }, [enabled, noSleep, paragraphs, updateCurrentParagraph]);
 
   const pauseSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {

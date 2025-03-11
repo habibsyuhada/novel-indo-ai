@@ -51,17 +51,11 @@ export default function ChapterPage() {
   // TTS functionality
   const paragraphs = chapterData?.text.split('\n').filter(p => p.trim() !== '') || [];
   
-  const scrollToParagraph = useCallback((index: number) => {
-    if (contentElement) {
-      const paragraphElements = contentElement.querySelectorAll('p');
-      if (paragraphElements[index]) {
-        paragraphElements[index].scrollIntoView({
-          behavior: 'smooth',
-          block: 'start'
-        });
-      }
-    }
-  }, [contentElement]);
+  // handleParagraphChange is now a simple pass-through function
+  // Auto-scroll is now handled in the ChapterContent component
+  const handleParagraphChange = useCallback(() => {
+    // No-op - scrolling is handled in ChapterContent
+  }, []);
   
   const {
     isPlaying,
@@ -75,7 +69,7 @@ export default function ChapterPage() {
   } = useTts({ 
     enabled: ttsEnabled, 
     paragraphs,
-    onParagraphChange: scrollToParagraph
+    onParagraphChange: handleParagraphChange
   });
   
   // Handle play/pause button
