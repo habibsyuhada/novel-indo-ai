@@ -14,7 +14,7 @@ const nextConfig = {
   headers: async () => {
     return [
       {
-        source: '/service-worker.js',
+        source: '/sw.js',
         headers: [
           {
             key: 'Cache-Control',
