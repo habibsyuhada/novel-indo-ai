@@ -251,7 +251,7 @@ export default function ChapterPage() {
     if (paragraphRefs.current[index]) {
       paragraphRefs.current[index]?.scrollIntoView({
         behavior: 'smooth',
-        block: 'center'
+        block: 'start'
       });
     }
   }, []);
