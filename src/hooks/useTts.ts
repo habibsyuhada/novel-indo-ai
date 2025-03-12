@@ -166,13 +166,38 @@ export const useTts = ({
     // Cancel any ongoing speech
     speechSynthesisRef.current?.cancel();
     
-    // Split long text into smaller chunks (around 200 characters each)
-    const chunks = text.match(/.{1,200}(?=\\s|$)/g) || [text];
+    // Pecah teks menjadi kalimat-kalimat terlebih dahulu
+    // Menggunakan regex untuk memecah berdasarkan tanda baca akhir kalimat (., !, ?)
+    // dengan mempertahankan tanda bacanya
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+    
+    // Array untuk menyimpan semua chunk dari semua kalimat
+    const allChunks: string[] = [];
+    
+    // Proses setiap kalimat
+    sentences.forEach(sentence => {
+      // Jika panjang kalimat lebih dari 200, pecah lagi menjadi chunk
+      if (sentence.length > 200) {
+        // Pecah kalimat menjadi chunk maksimal 200 karakter
+        // dengan memastikan pemisahan pada spasi untuk menjaga kata tetap utuh
+        const sentenceChunks = sentence.match(/.{1,200}(?=\\s|$|\b)/g) || [sentence];
+        allChunks.push(...sentenceChunks);
+      } else {
+        // Jika kalimat pendek, tambahkan langsung
+        allChunks.push(sentence);
+      }
+    });
+    
+    // Jika tidak ada kalimat yang terdeteksi, gunakan teks asli
+    if (allChunks.length === 0) {
+      allChunks.push(text);
+    }
+    
     let currentChunkIndex = 0;
 
     const speakNextChunk = () => {
-      if (currentChunkIndex < chunks.length) {
-        const utterance = new SpeechSynthesisUtterance(chunks[currentChunkIndex].trim());
+      if (currentChunkIndex < allChunks.length) {
+        const utterance = new SpeechSynthesisUtterance(allChunks[currentChunkIndex].trim());
         utteranceRef.current = utterance;
 
         // Get settings from Redux store
@@ -210,7 +235,7 @@ export const useTts = ({
 
         utterance.onend = () => {
           currentChunkIndex++;
-          if (currentChunkIndex < chunks.length) {
+          if (currentChunkIndex < allChunks.length) {
             speakNextChunk();
           } else {
             // Move to next paragraph
