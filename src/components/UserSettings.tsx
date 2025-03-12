@@ -12,7 +12,8 @@ import {
   setTtsScrollPosition,
   setTtsScrollBehavior,
   setTtsAutoPlay,
-  setTtsAutoPlayDelay
+  setTtsAutoPlayDelay,
+  setTtsNoSleep
 } from '../store/settingsSlice';
 import { X } from 'lucide-react';
 
@@ -36,7 +37,8 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
     ttsScrollPosition,
     ttsScrollBehavior,
     ttsAutoPlay,
-    ttsAutoPlayDelay
+    ttsAutoPlayDelay,
+    ttsNoSleep
   } = useSelector((state: RootState) => state.settings);
 
   // Check if device is mobile
@@ -110,6 +112,11 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
       const savedTtsAutoPlayDelay = localStorage.getItem('ttsAutoPlayDelay');
       if (savedTtsAutoPlayDelay) {
         dispatch(setTtsAutoPlayDelay(parseInt(savedTtsAutoPlayDelay)));
+      }
+      
+      const savedTtsNoSleep = localStorage.getItem('ttsNoSleep');
+      if (savedTtsNoSleep) {
+        dispatch(setTtsNoSleep(savedTtsNoSleep === 'true'));
       }
     }
   }, [dispatch]);
@@ -208,6 +215,13 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
     localStorage.setItem('ttsAutoPlayDelay', value.toString());
   };
 
+  // Add NoSleep toggle handler
+  const toggleTtsNoSleep = () => {
+    const newValue = !ttsNoSleep;
+    dispatch(setTtsNoSleep(newValue));
+    localStorage.setItem('ttsNoSleep', newValue.toString());
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -292,7 +306,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                 <span className="label-text font-medium">Text-to-Speech</span>
               </label>
               <div className="flex items-center gap-2">
-                <span>Nonaktif</span>
+                <span>Nonactive</span>
                 <input 
                   type="checkbox" 
                   className="toggle toggle-primary" 
@@ -300,7 +314,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                   onChange={toggleTts}
                   aria-label="Toggle text-to-speech"
                 />
-                <span>Aktif</span>
+                <span>Active</span>
               </div>
             </div>
 
@@ -377,7 +391,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                     <span className="label-text font-medium">Auto-scroll Text</span>
                   </label>
                   <div className="flex items-center gap-2">
-                    <span>Nonaktif</span>
+                    <span>Nonactive</span>
                     <input 
                       type="checkbox" 
                       className="toggle toggle-primary" 
@@ -385,7 +399,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                       onChange={toggleTtsAutoScroll}
                       aria-label="Toggle auto-scroll"
                     />
-                    <span>Aktif</span>
+                    <span>Active</span>
                   </div>
                 </div>
 
@@ -456,7 +470,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                     <span className="label-text font-medium">Auto-Play to Next Chapter</span>
                   </label>
                   <div className="flex items-center gap-2">
-                    <span>Nonaktif</span>
+                    <span>Nonactive</span>
                     <input 
                       type="checkbox" 
                       className="toggle toggle-primary" 
@@ -464,19 +478,19 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                       onChange={toggleTtsAutoPlay}
                       aria-label="Toggle auto-play next chapter"
                     />
-                    <span>Aktif</span>
+                    <span>Active</span>
                   </div>
                 </div>
 
                 {/* Auto-play delay - Only show when auto-play is enabled */}
                 {ttsAutoPlay && (
-                  <div className="form-control mt-2 pl-2">
+                  <div className="form-control">
                     <label className="label">
-                      <span className="label-text font-medium">Delay: {ttsAutoPlayDelay} seconds</span>
+                      <span className="label-text font-medium">Auto-Play Delay: {ttsAutoPlayDelay}s</span>
                     </label>
                     <input 
                       type="range" 
-                      min="1" 
+                      min="3" 
                       max="10" 
                       step="1"
                       value={ttsAutoPlayDelay}
@@ -485,12 +499,33 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose }) => {
                       aria-label="Auto-play delay"
                     />
                     <div className="flex justify-between text-xs mt-1">
-                      <span>1s</span>
+                      <span>3s</span>
                       <span>5s</span>
                       <span>10s</span>
                     </div>
                   </div>
                 )}
+
+                {/* NoSleep Setting */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-medium">Prevent Screen From Turning Off</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span>Nonactive</span>
+                    <input 
+                      type="checkbox" 
+                      className="toggle toggle-primary" 
+                      checked={ttsNoSleep}
+                      onChange={toggleTtsNoSleep}
+                      aria-label="Toggle NoSleep"
+                    />
+                    <span>Active</span>
+                  </div>
+                  <div className="text-xs text-base-content text-opacity-70 mt-1">
+										Enabling this feature will prevent the device&apos;s screen from automatically turning off while TTS is active, but it will increase battery consumption.
+                  </div>
+                </div>
               </div>
             )}
           </div>

@@ -13,6 +13,7 @@ interface SettingsState {
   ttsScrollBehavior: 'smooth' | 'auto';
   ttsAutoPlay: boolean;
   ttsAutoPlayDelay: number;
+  ttsNoSleep: boolean;
 }
 
 const initialState: SettingsState = {
@@ -27,7 +28,8 @@ const initialState: SettingsState = {
   ttsScrollPosition: 'start',
   ttsScrollBehavior: 'smooth',
   ttsAutoPlay: false,
-  ttsAutoPlayDelay: 5
+  ttsAutoPlayDelay: 5,
+  ttsNoSleep: false
 };
 
 const settingsSlice = createSlice({
@@ -69,6 +71,9 @@ const settingsSlice = createSlice({
     },
     setTtsAutoPlayDelay: (state, action: PayloadAction<number>) => {
       state.ttsAutoPlayDelay = action.payload;
+    },
+    setTtsNoSleep: (state, action: PayloadAction<boolean>) => {
+      state.ttsNoSleep = action.payload;
     }
   }
 });
@@ -85,6 +90,7 @@ export const {
   setTtsScrollPosition,
   setTtsScrollBehavior,
   setTtsAutoPlay,
-  setTtsAutoPlayDelay
+  setTtsAutoPlayDelay,
+  setTtsNoSleep
 } = settingsSlice.actions;
 export default settingsSlice.reducer; 

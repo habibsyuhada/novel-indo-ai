@@ -49,7 +49,14 @@ export const useTts = ({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       import('nosleep.js').then((NoSleepModule) => {
-        setNoSleep(new NoSleepModule.default());
+        const noSleepInstance = new NoSleepModule.default();
+        setNoSleep(noSleepInstance);
+        
+        // Langsung cek pengaturan ttsNoSleep begitu NoSleep terinisialisasi
+        const { ttsNoSleep } = store.getState().settings;
+        if (ttsNoSleep) {
+          noSleepInstance.enable();
+        }
       }).catch(err => {
         console.error('Failed to load NoSleep module:', err);
       });
@@ -62,28 +69,43 @@ export const useTts = ({
     };
   }, []);
 
-  // Handle visibility change
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isPlaying && !isPaused) {
-        if (noSleep) {
-          noSleep.enable();
-        }
-      } else if (document.visibilityState === 'hidden' || !isPlaying || isPaused) {
-        if (noSleep) {
-          noSleep.disable();
-        }
+  // Fungsi untuk memperbarui status NoSleep berdasarkan pengaturan saja
+  const updateNoSleepState = useCallback(() => {
+    const { ttsNoSleep } = store.getState().settings;
+    
+    if (noSleep) {
+      if (ttsNoSleep) {
+        noSleep.enable();
+      } else {
+        noSleep.disable();
       }
-    };
+    }
+  }, [noSleep]);
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+  // Tambahkan subscriber ke store untuk memantau perubahan pengaturan ttsNoSleep
+  useEffect(() => {
+    let currentNoSleepValue = store.getState().settings.ttsNoSleep;
+    
+    const unsubscribe = store.subscribe(() => {
+      const newNoSleepValue = store.getState().settings.ttsNoSleep;
+      
+      // Hanya update jika nilai berubah
+      if (newNoSleepValue !== currentNoSleepValue) {
+        currentNoSleepValue = newNoSleepValue;
+        updateNoSleepState();
+      }
+    });
+    
+    // Initial update
+    updateNoSleepState();
+    
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      unsubscribe();
       if (noSleep) {
         noSleep.disable();
       }
     };
-  }, [isPlaying, isPaused, noSleep]);
+  }, [noSleep, updateNoSleepState]);
 
   // Clean up autoplay timer on unmount
   useEffect(() => {
@@ -118,11 +140,6 @@ export const useTts = ({
       setIsPaused(false);
       setCurrentText('');
       setCurrentParagraphIndex(0);
-      
-      // Disable NoSleep
-      if (noSleep) {
-        noSleep.disable();
-      }
     }
     
     // Clear any existing timer
@@ -151,17 +168,12 @@ export const useTts = ({
       
       setAutoPlayTimer(timer);
     }
-  }, [autoPlayTimer, hasNextChapter, onChapterEnd, noSleep]);
+  }, [autoPlayTimer, hasNextChapter, onChapterEnd]);
 
   // Function for starting speech
   const startSpeaking = useCallback((text: string, index: number) => {
     // Jangan mulai TTS jika sedang dalam status auto-play (countdown)
     if (!speechSynthesisRef.current || !enabled || isAutoPlaying) return;
-
-    // Enable NoSleep when starting speech
-    if (noSleep) {
-      noSleep.enable();
-    }
 
     // Cancel any ongoing speech
     speechSynthesisRef.current?.cancel();
@@ -257,11 +269,6 @@ export const useTts = ({
               // Pastikan TTS tidak dimulai ulang saat auto-play countdown sedang berjalan
               if (hasNextChapter) {
                 handleChapterEnd();
-              } else {
-                // If there's no next chapter, just disable NoSleep
-                if (noSleep) {
-                  noSleep.disable();
-                }
               }
             }
           }
@@ -270,19 +277,11 @@ export const useTts = ({
         utterance.onpause = () => {
           setIsPaused(true);
           setIsPlaying(false);
-          // Disable NoSleep when TTS is paused
-          if (noSleep) {
-            noSleep.disable();
-          }
         };
 
         utterance.onresume = () => {
           setIsPaused(false);
           setIsPlaying(true);
-          // Enable NoSleep when TTS is resumed
-          if (noSleep) {
-            noSleep.enable();
-          }
         };
 
         utterance.onerror = (event) => {
@@ -290,10 +289,6 @@ export const useTts = ({
           setIsPaused(false);
           setIsPlaying(false);
           setCurrentText('');
-          // Disable NoSleep on error
-          if (noSleep) {
-            noSleep.disable();
-          }
         };
 
         speechSynthesisRef.current?.speak(utterance);
@@ -302,33 +297,23 @@ export const useTts = ({
 
     speakNextChunk();
     setCurrentParagraphIndex(index);
-  }, [enabled, noSleep, paragraphs, updateCurrentParagraph, handleChapterEnd, isAutoPlaying]);
+  }, [enabled, paragraphs, updateCurrentParagraph, handleChapterEnd, isAutoPlaying]);
 
   const pauseSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.pause();
       setIsPaused(true);
       setIsPlaying(false);
-      
-      // Disable NoSleep when paused
-      if (noSleep) {
-        noSleep.disable();
-      }
     }
-  }, [noSleep]);
+  }, []);
 
   const resumeSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
       speechSynthesisRef.current.resume();
       setIsPaused(false);
       setIsPlaying(true);
-      
-      // Enable NoSleep when resumed
-      if (noSleep) {
-        noSleep.enable();
-      }
     }
-  }, [noSleep]);
+  }, []);
 
   // Cancel auto-play when manually stopping
   const stopSpeaking = useCallback(() => {
@@ -350,13 +335,8 @@ export const useTts = ({
         setAutoPlayTimer(null);
         setIsAutoPlaying(false);
       }
-      
-      // Disable NoSleep when stopped
-      if (noSleep) {
-        noSleep.disable();
-      }
     }
-  }, [noSleep, autoPlayTimer]);
+  }, [autoPlayTimer]);
 
   return {
     isPlaying,
