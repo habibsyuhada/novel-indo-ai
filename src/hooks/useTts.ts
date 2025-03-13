@@ -188,12 +188,21 @@ export const useTts = ({
     
     // Proses setiap kalimat
     sentences.forEach(sentence => {
-      // Jika panjang kalimat lebih dari 200, pecah lagi menjadi chunk
+      // Jika panjang kalimat lebih dari 200, coba pecah berdasarkan koma dulu
       if (sentence.length > 200) {
-        // Pecah kalimat menjadi chunk maksimal 200 karakter
-        // dengan memastikan pemisahan pada spasi untuk menjaga kata tetap utuh
-        const sentenceChunks = sentence.match(/.{1,200}(?=\\s|$|\b)/g) || [sentence];
-        allChunks.push(...sentenceChunks);
+        // Pecah berdasarkan koma terlebih dahulu
+        const commaChunks = sentence.split(/,(?=\s)/).filter(Boolean);
+        
+        // Proses setiap bagian yang sudah dipecah berdasarkan koma
+        commaChunks.forEach(commaChunk => {
+          // Jika bagian masih lebih dari 200 karakter, pecah lagi
+          if (commaChunk.length > 200) {
+            const sentenceChunks = commaChunk.match(/.{1,200}(?=\\s|$|\b)/g) || [commaChunk];
+            allChunks.push(...sentenceChunks);
+          } else {
+            allChunks.push(commaChunk);
+          }
+        });
       } else {
         // Jika kalimat pendek, tambahkan langsung
         allChunks.push(sentence);
