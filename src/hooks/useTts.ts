@@ -181,7 +181,7 @@ export const useTts = ({
     // Pecah teks menjadi kalimat-kalimat terlebih dahulu
     // Menggunakan regex untuk memecah berdasarkan tanda baca akhir kalimat (., !, ?)
     // dengan mempertahankan tanda bacanya
-    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+    const sentences = text.match(/[^.!?]+[.!?]?/g) || [text];
     
     // Array untuk menyimpan semua chunk dari semua kalimat
     const allChunks: string[] = [];
