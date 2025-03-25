@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Novel, getStorageUrl } from '../lib/supabase';
+import { formatDistanceToNow, parseISO } from 'date-fns';
 
 type NovelCardProps = {
   novel: Novel;
@@ -8,12 +9,17 @@ type NovelCardProps = {
 };
 
 export default function NovelCard({ novel, totalChapters = 0 }: NovelCardProps) {
-  // Format genre list
-  const genres = novel.genre.split(';').filter(g => g.trim() !== '');
   const coverUrl = novel.cover ? getStorageUrl(novel.cover) : null;
   
   // Use URL if available, otherwise fallback to ID
   const novelLink = novel.url ? `/novel/${novel.url}` : `/novel/${novel.id}`;
+
+	const getRelativeTime = (dateString: string) => {  
+    const date = parseISO(dateString); // Mengonversi string tanggal ke objek Date  
+    return formatDistanceToNow(date, { addSuffix: true }); // Menghitung waktu relatif  
+	};
+
+
 
   return (
     <Link href={novelLink} className="card bg-base-100 hover:shadow-xl transition-shadow duration-200">
@@ -46,22 +52,14 @@ export default function NovelCard({ novel, totalChapters = 0 }: NovelCardProps) 
           </div>
           
           <h2 className="card-title text-lg line-clamp-2 mb-2">{novel.name}</h2>
-          <p className="text-sm text-base-content/70 mb-2">{novel.author}</p>
           
           <p className="text-sm text-primary mb-3">
             {totalChapters} {totalChapters === 1 ? 'chapter' : 'chapters'}
           </p>
-          
-          {genres.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {genres.slice(0, 2).map((genre) => (
-                <span key={genre} className="badge badge-sm badge-primary">{genre}</span>
-              ))}
-              {genres.length > 2 && (
-                <span className="badge badge-sm">+{genres.length - 2}</span>
-              )}
-            </div>
-          )}
+					
+					<p className="text-sm text-primary">
+            Last Updated:<br/>{getRelativeTime(novel.updated_date)}
+          </p>
         </div>
       </div>
     </Link>

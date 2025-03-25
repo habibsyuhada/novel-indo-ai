@@ -36,7 +36,7 @@ export default function Home() {
         const { data: novelsData, error: novelsError } = await supabase
           .from('novel')
           .select('*')
-          .order('id', { ascending: false })
+          .order('updated_date', { ascending: false })
           .limit(10);
 
         if (novelsError) throw novelsError;

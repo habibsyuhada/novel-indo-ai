@@ -31,7 +31,7 @@ export type Novel = {
   cover: string | null;
   url: string | null;
   created_at: string;
-  updated_at: string;
+  updated_date: string;
 };
 
 export type NovelChapter = {
