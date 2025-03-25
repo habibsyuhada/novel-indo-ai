@@ -11,14 +11,14 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     // Fetch all novels
     const { data: novels, error: novelsError } = await supabase
       .from('novel')
-      .select('id, url, updated_at');
+      .select('id, url, updated_date');
 
     if (novelsError) throw novelsError;
 
     // Fetch all chapters
     const { data: chapters, error: chaptersError } = await supabase
       .from('novel_chapter')
-      .select('novel, chapter, updated_at');
+      .select('novel, chapter, updated_date');
 
     if (chaptersError) throw chaptersError;
 
@@ -43,7 +43,7 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   ${novels.map(novel => `
   <url>
     <loc>${baseUrl}/novel/${novel.url || novel.id}</loc>
-    <lastmod>${novel.updated_at}</lastmod>
+    <lastmod>${novel.updated_date}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>`).join('')}
@@ -52,7 +52,7 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   ${chapters.map(chapter => `
   <url>
     <loc>${baseUrl}/novel/${chapter.novel}/chapter/${chapter.chapter}</loc>
-    <lastmod>${chapter.updated_at}</lastmod>
+    <lastmod>${chapter.updated_date}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>`).join('')}

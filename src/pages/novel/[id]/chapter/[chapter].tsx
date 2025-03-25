@@ -257,7 +257,7 @@ export default function ChapterPage() {
           chapterData.chapter,
           `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}/novel/${novel.url || novel.id}/chapter/${chapterData.chapter}`,
           novel.created_at,
-          novel.updated_at
+          novel.updated_date
         )}
         id={`json-ld-article-${novel.id}-${chapterData.chapter}`}
       />
