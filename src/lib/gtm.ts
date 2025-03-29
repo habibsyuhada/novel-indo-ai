@@ -48,12 +48,11 @@ export const trackPageView = (page: string) => {
   });
 };
 
-export const trackNovelView = (novel: { id: number; name: string; author: string }) => {
+export const trackNovelView = (novel: { id: number; name: string }) => {
   pushGTMEvent({
     event: 'novel_view',
     novel_id: novel.id,
     novel_name: novel.name,
-    novel_author: novel.author,
   });
 };
 

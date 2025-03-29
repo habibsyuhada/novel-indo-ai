@@ -82,8 +82,7 @@ export default function NovelDetail() {
           // Track novel view
           trackNovelView({
             id: novelData.id,
-            name: novelData.name,
-            author: novelData.author || 'Unknown'
+            name: novelData.name
           });
           
           // Get total chapter count
@@ -160,10 +159,9 @@ export default function NovelDetail() {
     <>
       <SEO 
         title={`${novel.name} - Baca Novel Indo`}
-        description={novel.description ?? `Baca novel ${novel.name} karya ${novel.author} secara online di Baca Novel Indo.`}
+        description={novel.description ?? `Baca novel ${novel.name} secara online di Baca Novel Indo.`}
         image={novel.cover ?? '/images/default-cover.jpg'}
-        keywords={`${novel.name}, ${novel.author}, ${genres.join(', ')}, ${tags.join(', ')}, novel online`}
-        author={novel.author}
+        keywords={`${novel.name}, ${genres.join(', ')}, ${tags.join(', ')}, novel online`}
         article={true}
       />
       
@@ -215,9 +213,7 @@ export default function NovelDetail() {
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
                   <div className="space-y-2">
-                    <p><span className="font-semibold">Author:</span> {novel.author || 'Unknown'}</p>
                     <p><span className="font-semibold">Status:</span> <span className={`badge ${novel.status === 0 ? 'badge-warning' : 'badge-success'}`}>{novel.status === 0 ? 'Ongoing' : 'Completed'}</span></p>
-                    <p><span className="font-semibold">Publisher:</span> {novel.publishers || 'Unknown'}</p>
                     <p><span className="font-semibold">Year:</span> {novel.year || 'Unknown'}</p>
                     <div>
                       <p className="font-semibold mb-1">Genres:</p>

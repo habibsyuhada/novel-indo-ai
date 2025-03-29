@@ -80,7 +80,7 @@ export default function Home() {
       const filtered = novels.filter(
         novel => 
           novel.name.toLowerCase().includes(term) || 
-          novel.author.toLowerCase().includes(term) || 
+          novel.tag?.toLowerCase().includes(term) || 
           novel.genre.toLowerCase().includes(term) ||
           (novel.tag && novel.tag.toLowerCase().includes(term))
       );
@@ -131,7 +131,7 @@ export default function Home() {
             <div className="relative">
               <input 
                 type="text" 
-                placeholder={isMobile ? "Search novels..." : "Search novels by title, author, genre..."} 
+                placeholder={isMobile ? "Search novels..." : "Search novels by title, tag, genre..."} 
                 className="input input-bordered w-full pl-11" 
                 value={searchTerm}
                 onChange={handleSearch}

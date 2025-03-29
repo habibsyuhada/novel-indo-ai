@@ -242,10 +242,9 @@ export default function ChapterPage() {
     <>
       <SEO 
         title={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title} - Baca Novel Indo`}
-        description={`Baca ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title} karya ${novel.author} secara online di Baca Novel Indo.`}
+        description={`Baca ${novel.name} Chapter ${chapterData.chapter}: ${chapterData.title} secara online di Baca Novel Indo.`}
         image={novel.cover ?? '/images/default-cover.jpg'}
-        keywords={`${novel.name}, Chapter ${chapterData.chapter}, ${chapterData.title}, ${novel.author}, ${novel.genre || 'Novel'}, baca novel online`}
-        author={novel.author}
+        keywords={`${novel.name}, Chapter ${chapterData.chapter}, ${chapterData.title}, ${novel.genre || 'Novel'}, baca novel online`}
         article={true}
       />
       
