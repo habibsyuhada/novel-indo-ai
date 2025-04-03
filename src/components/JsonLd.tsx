@@ -121,7 +121,7 @@ export const generateBookData = (novel: Novel, url: string) => {
     name: novel.name,
     author: novel.author,
     description: novel.description || `Novel ${novel.name} by ${novel.author}`,
-    genre: novel.genre.split(';').filter(g => g.trim() !== '').join(', '),
+    genre: novel.genre ? novel.genre.split(';').filter(g => g.trim() !== '').join(', ') : '',
     publisher: novel.publishers || 'Baca Novel Indo',
     url,
     image: novel.cover || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}/images/default-cover.jpg`,
