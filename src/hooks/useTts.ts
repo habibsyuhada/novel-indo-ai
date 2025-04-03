@@ -179,9 +179,23 @@ export const useTts = ({
     speechSynthesisRef.current?.cancel();
     
     // Pecah teks menjadi kalimat-kalimat terlebih dahulu
-    // Menggunakan regex untuk memecah berdasarkan tanda baca akhir kalimat (., !, ?)
-    // dengan mempertahankan tanda bacanya
-    const sentences = text.match(/[^.!?]+[.!?]?/g) || [text];
+    // Gunakan pendekatan yang lebih aman untuk memecah kalimat tanpa memisahkan angka format Indonesia
+    // Proses pra-pemisahan untuk menandai titik yang ada dalam angka
+    let processedText = text;
+    
+    // Cari pola angka dengan titik (format Indonesia: 1.000, 50.000, dst)
+    // dan ganti titik dalam angka dengan penanda khusus
+    processedText = processedText.replace(/\b\d{1,3}(?:\.\d{3})+\b/g, (match) => {
+      return match.replace(/\./g, "{{DOT}}");
+    });
+    
+    // Sekarang pecah teks berdasarkan tanda baca akhir kalimat
+    const tempSentences = processedText.match(/[^.!?]+[.!?]?/g) || [processedText];
+    
+    // Kembalikan penanda ke titik asli
+    const sentences = tempSentences.map(sentence => 
+      sentence.replace(/{{DOT}}/g, ".")
+    );
     
     // Array untuk menyimpan semua chunk dari semua kalimat
     const allChunks: string[] = [];

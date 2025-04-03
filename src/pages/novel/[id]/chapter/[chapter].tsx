@@ -129,9 +129,9 @@ export default function ChapterPage() {
         try {
 					console.log('mulai')
           // Gunakan Promise untuk menunggu delay
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          console.log('Starting TTS for new chapter');
-					console.log('gass')
+          // await new Promise(resolve => setTimeout(resolve, 2000));
+          // console.log('Starting TTS for new chapter');
+					// console.log('gass')
 					// console.log(chapterData)
           // startSpeaking(paragraphs[0], 0);
 					

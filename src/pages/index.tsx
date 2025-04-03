@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import NovelCard from '../components/NovelCard';
 import { supabase, Novel } from '../lib/supabase';
 import SEO from '../components/SEO';
@@ -13,8 +13,26 @@ export default function Home() {
   const [novels, setNovels] = useState<NovelWithChapters[]>([]);
   const [filteredNovels, setFilteredNovels] = useState<NovelWithChapters[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobile, setIsMobile] = useState(false);
+  const [page, setPage] = useState(0);
+  const ITEMS_PER_PAGE = 12;
+  
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastNovelElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading || loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore && !searchTerm) {
+        loadMoreNovels();
+      }
+    }, { threshold: 0.5 });
+    
+    if (node) observer.current.observe(node);
+  }, [loading, loadingMore, hasMore, searchTerm]);
 
   useEffect(() => {
     // Check if device is mobile
@@ -28,48 +46,74 @@ export default function Home() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  useEffect(() => {
-    const fetchNovels = async () => {
-      try {
+  const fetchNovels = async (currentPage: number) => {
+    try {
+      const offset = currentPage * ITEMS_PER_PAGE;
+      
+      if (currentPage === 0) {
         setLoading(true);
-        // Fetch novels with total chapters count
-        const { data: novelsData, error: novelsError } = await supabase
-          .from('novel')
-          .select('*')
-          .order('updated_date', { ascending: false })
-          .limit(10);
+      } else {
+        setLoadingMore(true);
+      }
+      
+      // Fetch novels with total chapters count
+      const { data: novelsData, error: novelsError } = await supabase
+        .from('novel')
+        .select('*')
+        .order('updated_date', { ascending: false })
+        .range(offset, offset + ITEMS_PER_PAGE - 1);
 
-        if (novelsError) throw novelsError;
+      if (novelsError) throw novelsError;
 
-        if (novelsData) {
-          // Fetch total chapters count for each novel
-          const novelsWithChapters = await Promise.all(
-            novelsData.map(async (novel) => {
-              const { count, error: countError } = await supabase
-                .from('novel_chapter')
-                .select('id', { count: 'exact', head: true })
-                .eq('novel', novel.id);
+      if (novelsData) {
+        // Fetch total chapters count for each novel
+        const novelsWithChapters = await Promise.all(
+          novelsData.map(async (novel) => {
+            const { count, error: countError } = await supabase
+              .from('novel_chapter')
+              .select('id', { count: 'exact', head: true })
+              .eq('novel', novel.id);
 
-              if (countError) throw countError;
+            if (countError) throw countError;
 
-              return {
-                ...novel,
-                total_chapters: count || 0
-              };
-            })
-          );
+            return {
+              ...novel,
+              total_chapters: count || 0
+            };
+          })
+        );
 
+        if (novelsWithChapters.length < ITEMS_PER_PAGE) {
+          setHasMore(false);
+        }
+
+        if (currentPage === 0) {
           setNovels(novelsWithChapters);
           setFilteredNovels(novelsWithChapters);
+        } else {
+          setNovels(prev => [...prev, ...novelsWithChapters]);
+          setFilteredNovels(prev => [...prev, ...novelsWithChapters]);
         }
-      } catch (error) {
-        console.error('Error fetching novels:', error);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching novels:', error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
-    fetchNovels();
+  const loadMoreNovels = () => {
+    if (!loadingMore && hasMore && !searchTerm) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchNovels(nextPage);
+    }
+  };
+
+  useEffect(() => {
+    // Mulai dengan halaman pertama
+    fetchNovels(0);
   }, []);
 
   useEffect(() => {
@@ -166,13 +210,26 @@ export default function Home() {
             <>
               {filteredNovels.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-                  {filteredNovels.map((novel) => (
-                    <NovelCard 
-                      key={novel.id} 
-                      novel={novel} 
-                      totalChapters={novel.total_chapters}
-                    />
-                  ))}
+                  {filteredNovels.map((novel, index) => {
+                    if (filteredNovels.length === index + 1 && !searchTerm) {
+                      return (
+                        <div ref={lastNovelElementRef} key={novel.id}>
+                          <NovelCard 
+                            novel={novel} 
+                            totalChapters={novel.total_chapters}
+                          />
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <NovelCard 
+                          key={novel.id} 
+                          novel={novel} 
+                          totalChapters={novel.total_chapters}
+                        />
+                      );
+                    }
+                  })}
                 </div>
               ) : (
                 <div className="min-h-[400px] flex justify-center items-center">
@@ -185,6 +242,21 @@ export default function Home() {
                       {searchTerm ? 'Try different keywords or check your spelling.' : 'Check back later for new novels.'}
                     </p>
                   </div>
+                </div>
+              )}
+              
+              {loadingMore && (
+                <div className="flex justify-center my-8">
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="loading loading-spinner loading-md"></span>
+                    <p className="text-base-content/70">Loading more novels...</p>
+                  </div>
+                </div>
+              )}
+              
+              {!hasMore && novels.length > ITEMS_PER_PAGE && !searchTerm && (
+                <div className="text-center mt-8 text-base-content/70">
+                  <p>Semua novel sudah ditampilkan</p>
                 </div>
               )}
             </>
