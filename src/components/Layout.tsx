@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import { toggleSettings, setTheme } from '../store/settingsSlice';
 import { Moon, Sun } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 // import InstallPWA from './InstallPWA';
 
 type LayoutProps = {
@@ -15,6 +16,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [mounted, setMounted] = useState(false);
   const dispatch = useDispatch();
   const { isSettingsOpen, theme } = useSelector((state: RootState) => state.settings);
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     setMounted(true);
@@ -63,7 +65,48 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Link>
           </div>
           
-          <div className="flex-none">
+          <div className="flex-none space-x-2">
+            {user ? (
+              <div className="flex items-center space-x-2">
+                <span className={`${theme === 'light' ? 'text-white' : 'text-[#e5e7eb]'}`}>
+                  {user.email}
+                </span>
+                <button
+                  onClick={() => signOut()}
+                  className={`btn btn-ghost ${
+                    theme === 'light' 
+                      ? 'text-white hover:text-white/90' 
+                      : 'text-[#e5e7eb] hover:text-[#e5e7eb]/90'
+                  }`}
+                >
+                  Keluar
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Link
+                  href="/login"
+                  className={`btn btn-ghost ${
+                    theme === 'light' 
+                      ? 'text-white hover:text-white/90' 
+                      : 'text-[#e5e7eb] hover:text-[#e5e7eb]/90'
+                  }`}
+                >
+                  Masuk
+                </Link>
+                <Link
+                  href="/register"
+                  className={`btn btn-ghost ${
+                    theme === 'light' 
+                      ? 'text-white hover:text-white/90' 
+                      : 'text-[#e5e7eb] hover:text-[#e5e7eb]/90'
+                  }`}
+                >
+                  Daftar
+                </Link>
+              </div>
+            )}
+            
             {/* Theme toggle */}
             <button 
               onClick={handleToggleTheme}
