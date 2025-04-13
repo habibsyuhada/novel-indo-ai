@@ -37,7 +37,7 @@ const AutoPlayCountdown: React.FC<AutoPlayCountdownProps> = ({ isActive, onCance
     return () => {
       clearInterval(timer);
     };
-  }, [isActive, ttsAutoPlayDelay]);
+  }, [isActive, ttsAutoPlayDelay, chapterData.chapter]);
 
   if (!isActive) return null;
 

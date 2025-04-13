@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
 import { Mail, Lock } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -13,7 +11,6 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const { signUp, loading, error } = useAuth();
   const router = useRouter();
-  const { theme } = useSelector((state: RootState) => state.settings);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
