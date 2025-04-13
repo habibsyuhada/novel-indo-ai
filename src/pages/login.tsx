@@ -14,8 +14,12 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await signIn(email, password);
-    router.push('/');
+    const success = await signIn(email, password);
+    
+    // Hanya redirect jika login berhasil
+    if (success) {
+      router.push('/');
+    }
   };
 
   return (

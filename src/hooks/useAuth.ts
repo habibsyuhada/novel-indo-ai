@@ -31,7 +31,7 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string): Promise<boolean> => {
     try {
       setAuthState(prev => ({ ...prev, loading: true, error: null }));
       const { error } = await supabase.auth.signUp({
@@ -39,14 +39,16 @@ export const useAuth = () => {
         password,
       });
       if (error) throw error;
+      return true;
     } catch (error: any) {
       setAuthState(prev => ({ ...prev, error: error.message }));
+      return false;
     } finally {
       setAuthState(prev => ({ ...prev, loading: false }));
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<boolean> => {
     try {
       setAuthState(prev => ({ ...prev, loading: true, error: null }));
       const { error } = await supabase.auth.signInWithPassword({
@@ -54,8 +56,10 @@ export const useAuth = () => {
         password,
       });
       if (error) throw error;
+      return true;
     } catch (error: any) {
       setAuthState(prev => ({ ...prev, error: error.message }));
+      return false;
     } finally {
       setAuthState(prev => ({ ...prev, loading: false }));
     }

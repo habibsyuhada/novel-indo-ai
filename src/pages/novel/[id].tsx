@@ -6,6 +6,7 @@ import { supabase, Novel, getStorageUrl } from '../../lib/supabase';
 import SEO from '../../components/SEO';
 import JsonLd, { generateBookData, generateBreadcrumbData } from '../../components/JsonLd';
 import { trackNovelView } from '../../lib/gtm';
+import CommentSection from '../../components/CommentSection';
 
 // Buat tipe baru untuk daftar chapter yang tidak memerlukan semua properti NovelChapter
 type ChapterListItem = {
@@ -360,6 +361,9 @@ export default function NovelDetail() {
           </div>
         </div>
       </div>
+
+      {/* Bagian Komentar */}
+      <CommentSection novelId={novel.id} />
     </>
   );
 } 

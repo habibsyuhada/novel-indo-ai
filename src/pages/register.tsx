@@ -14,8 +14,12 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await signUp(email, password);
-    router.push('/login');
+    const success = await signUp(email, password);
+    
+    // Hanya redirect jika registrasi berhasil
+    if (success) {
+      router.push('/login');
+    }
   };
 
   return (
