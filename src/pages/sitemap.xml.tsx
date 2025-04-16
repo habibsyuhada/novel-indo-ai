@@ -16,15 +16,15 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     if (novelsError) throw novelsError;
 
     // Fetch all chapters with novel URL information
-    const { data: chapters, error: chaptersError } = await supabase
-      .from('novel_chapter')
-      .select(`
-        novel,
-        chapter,
-        created_date
-      `);
+    // const { data: chapters, error: chaptersError } = await supabase
+    //   .from('novel_chapter')
+    //   .select(`
+    //     novel,
+    //     chapter,
+    //     created_date
+    //   `);
 
-    if (chaptersError) throw chaptersError;
+    // if (chaptersError) throw chaptersError;
 
     // Create a lookup map for novel URLs
     const novelUrlMap = new Map();
