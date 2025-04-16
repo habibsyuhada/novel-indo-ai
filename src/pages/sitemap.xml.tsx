@@ -59,14 +59,6 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     <priority>0.8</priority>
   </url>`).join('')}
   
-  <!-- Chapter pages -->
-  ${chapters.map(chapter => `
-  <url>
-    <loc>${baseUrl}/novel/${novelUrlMap.get(chapter.novel) || chapter.novel}/chapter/${chapter.chapter}</loc>
-    <lastmod>${chapter.created_date}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>`).join('')}
 </urlset>`;
 
     // Send the sitemap
