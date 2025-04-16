@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Content-Type', 'text/xml');
     
     // Create sitemap XML
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click';
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click';
     
     // Generate sitemap content
     const sitemap = `<?xml version="1.0" encoding="UTF-8"?>

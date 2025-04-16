@@ -153,7 +153,7 @@ export default function Home() {
       <JsonLd 
         type="website" 
         data={{
-          url: process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click',
+          url: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click',
           name: 'Baca Novel Indo',
           description: 'Baca novel Indonesia dan terjemahan secara online. Temukan novel favorit Anda dengan berbagai genre.'
         }}

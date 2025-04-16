@@ -255,7 +255,7 @@ export default function ChapterPage() {
           novel,
           chapterData.title,
           chapterData.chapter,
-          `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}/novel/${novel.url || novel.id}/chapter/${chapterData.chapter}`,
+          `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click'}/novel/${novel.url || novel.id}/chapter/${chapterData.chapter}`,
           novel.created_at,
           novel.updated_date
         )}

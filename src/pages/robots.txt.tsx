@@ -6,7 +6,7 @@ const Robots = () => {
 };
 
 export const getServerSideProps: GetServerSideProps = async ({ res }) => {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click';
   
   // Set the appropriate header
   res.setHeader('Content-Type', 'text/plain');
