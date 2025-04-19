@@ -19,7 +19,7 @@ export default function SEO({
   author = 'Baca Novel Indo',
 }: SEOProps) {
   const router = useRouter();
-  const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}${router.asPath}`;
+  const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click'}${router.asPath}`;
 
   return (
     <Head>
@@ -36,14 +36,14 @@ export default function SEO({
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
-      <meta property="og:image" content={image.startsWith('http') ? image : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}${image}`} />
+      <meta property="og:image" content={image.startsWith('http') ? image : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click'}${image}`} />
       
       {/* Twitter */}
       <meta property="twitter:card" content="summary_large_image" />
       <meta property="twitter:url" content={canonicalUrl} />
       <meta property="twitter:title" content={title} />
       <meta property="twitter:description" content={description} />
-      <meta property="twitter:image" content={image.startsWith('http') ? image : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}${image}`} />
+      <meta property="twitter:image" content={image.startsWith('http') ? image : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click'}${image}`} />
     </Head>
   );
 } 

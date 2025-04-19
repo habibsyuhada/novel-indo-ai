@@ -16,15 +16,15 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     if (novelsError) throw novelsError;
 
     // Fetch all chapters with novel URL information
-    const { data: chapters, error: chaptersError } = await supabase
-      .from('novel_chapter')
-      .select(`
-        novel,
-        chapter,
-        created_date
-      `);
+    // const { data: chapters, error: chaptersError } = await supabase
+    //   .from('novel_chapter')
+    //   .select(`
+    //     novel,
+    //     chapter,
+    //     created_date
+    //   `);
 
-    if (chaptersError) throw chaptersError;
+    // if (chaptersError) throw chaptersError;
 
     // Create a lookup map for novel URLs
     const novelUrlMap = new Map();
@@ -38,7 +38,7 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     res.setHeader('Content-Type', 'text/xml');
     
     // Create sitemap XML
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click';
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click';
     // Generate sitemap content
     const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -59,14 +59,6 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     <priority>0.8</priority>
   </url>`).join('')}
   
-  <!-- Chapter pages -->
-  ${chapters.map(chapter => `
-  <url>
-    <loc>${baseUrl}/novel/${novelUrlMap.get(chapter.novel) || chapter.novel}/chapter/${chapter.chapter}</loc>
-    <lastmod>${chapter.created_date}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>`).join('')}
 </urlset>`;
 
     // Send the sitemap

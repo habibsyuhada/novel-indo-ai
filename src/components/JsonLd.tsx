@@ -60,7 +60,7 @@ export default function JsonLd({ type, data, id }: JsonLdProps) {
             name: 'Baca Novel Indo',
             logo: {
               '@type': 'ImageObject',
-              url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}/icons/icon-192x192.png`,
+              url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click'}/icons/icon-192x192.png`,
             },
           },
           datePublished: data.datePublished,
@@ -124,7 +124,7 @@ export const generateBookData = (novel: Novel, url: string) => {
     genre: novel.genre ? novel.genre.split(';').filter(g => g.trim() !== '').join(', ') : '',
     publisher: novel.publishers || 'Baca Novel Indo',
     url,
-    image: novel.cover || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}/images/default-cover.jpg`,
+    image: novel.cover || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click'}/images/default-cover.jpg`,
   };
 };
 
@@ -143,7 +143,7 @@ export const generateArticleData = (
     author: novel.author,
     datePublished,
     dateModified,
-    image: novel.cover || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}/images/default-cover.jpg`,
+    image: novel.cover || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click'}/images/default-cover.jpg`,
     url,
   };
 }; 

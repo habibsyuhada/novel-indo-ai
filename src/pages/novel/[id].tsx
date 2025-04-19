@@ -148,7 +148,7 @@ export default function NovelDetail() {
   const tags = formatList(novel.tag);
   
   // Generate canonical URL for this novel
-  const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bacanovelindo.click'}/novel/${novel.url || novel.id}`;
+  const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click'}/novel/${novel.url || novel.id}`;
   
   // Generate breadcrumb items
   const breadcrumbItems = [
