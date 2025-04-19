@@ -66,7 +66,7 @@ const ChapterContent = ({
       itemScope 
       itemType="https://schema.org/Article"
       className={`flex-1 ${styles.chapterContent}`}
-      style={{ fontSize: `${fontSize}px` }}
+      style={{ fontSize: `${fontSize}px`, overflowX: 'auto' }}
     >
       <meta itemProp="headline" content={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title}`} />
       <meta itemProp="author" content={novel.author || 'Baca Novel Indo'} />
