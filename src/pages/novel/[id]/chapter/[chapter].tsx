@@ -18,7 +18,7 @@ import ChapterList from '../../../../components/chapter/ChapterList';
 import Navigation from '../../../../components/chapter/Navigation';
 import TtsControls from '../../../../components/chapter/TtsControls';
 import AutoPlayCountdown from '../../../../components/chapter/AutoPlayCountdown';
-import CommentSection from '../../../../components/CommentSection';
+// import CommentSection from '../../../../components/CommentSection';
 
 export default function ChapterPage() {
   const router = useRouter();
@@ -321,13 +321,13 @@ export default function ChapterPage() {
       </div>
       
       {/* Bagian Komentar - dipindahkan ke luar dari ChapterContent */}
-      {chapterData && novel && (
+      {/* {chapterData && novel && (
         <div className="card bg-base-100 shadow-xl mb-6">
           <div className="card-body p-3 md:p-6">
             <CommentSection chapterId={chapterData.id} novelId={novel.id} />
           </div>
         </div>
-      )}
+      )} */}
 
       {/* TTS Controls */}
       <TtsControls 

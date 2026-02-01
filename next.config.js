@@ -4,12 +4,13 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'supabase.bacanovelindo.click',
-        port: '',
-        pathname: '/storage/v1/object/public/**',
+        protocol: "https",
+        hostname: "storage.bacanovelindo.click",
+        port: "",
+        pathname: "/novel-covers/**",
       },
     ],
+    unoptimized: true,
   },
   headers: async () => {
     return [

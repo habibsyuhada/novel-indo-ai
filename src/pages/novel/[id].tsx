@@ -2,128 +2,94 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
-import { supabase, Novel, getStorageUrl } from '../../lib/supabase';
+import { Novel, getCoverUrl } from '../../lib/supabase';
 import SEO from '../../components/SEO';
 import JsonLd, { generateBookData, generateBreadcrumbData } from '../../components/JsonLd';
 import { trackNovelView } from '../../lib/gtm';
-import CommentSection from '../../components/CommentSection';
+// import CommentSection from '../../components/CommentSection';
 
-// Buat tipe baru untuk daftar chapter yang tidak memerlukan semua properti NovelChapter
 type ChapterListItem = {
   id: number;
   chapter: number;
   title: string;
 };
 
+type ChaptersApiResponse = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  data: ChapterListItem[];
+};
+
 export default function NovelDetail() {
   const router = useRouter();
   const { id } = router.query;
-  
+
   const [novel, setNovel] = useState<Novel | null>(null);
   const [chapters, setChapters] = useState<ChapterListItem[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [totalChapters, setTotalChapters] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   const chaptersPerPage = 50;
 
-  // Format genre and tags
   const formatList = (text: string | null) => {
     if (!text) return [];
     return text.split(';').filter(item => item.trim() !== '');
   };
 
-  // Fetch chapters for current page
-  const fetchChapterPage = useCallback(async (page: number) => {
-    if (!novel || !novel.id) return;
-    
+  const fetchNovel = useCallback(async () => {
+    if (!id) return;
+
+    setLoading(true);
     try {
-      const from = (page - 1) * chaptersPerPage;
-      const to = from + chaptersPerPage - 1;
-      
-      const { data } = await supabase
-        .from('novel_chapter')
-        .select('id, chapter, title')
-        .eq('novel', novel.id)  // Use the numeric ID from novel state
-        .order('chapter', { ascending: true })
-        .range(from, to);
-      
-      if (data) {
-        setChapters(data);
-        setCurrentPage(page);
-      }
-    } catch (error) {
-      console.error('Error fetching chapter page:', error);
+      const r = await fetch(`/api/novels/${encodeURIComponent(String(id))}`);
+      if (!r.ok) throw new Error(`Novel API error: ${r.status}`);
+      const novelData = (await r.json()) as Novel;
+
+      setNovel(novelData);
+
+      trackNovelView({ id: novelData.id, name: novelData.name });
+    } catch (e) {
+      console.error('Error fetching novel details:', e);
+      setNovel(null);
+    } finally {
+      setLoading(false);
     }
-  }, [novel, chaptersPerPage]);
+  }, [id]);
+
+  const fetchChapterPage = useCallback(async (page: number) => {
+    if (!novel?.id) return;
+
+    try {
+      const r = await fetch(
+        `/api/novels/${novel.id}/chapters?page=${page}&limit=${chaptersPerPage}`
+      );
+      if (!r.ok) throw new Error(`Chapters API error: ${r.status}`);
+
+      const json = (await r.json()) as ChaptersApiResponse;
+
+      setChapters(json.data);
+      setCurrentPage(json.page);
+      setTotalChapters(json.total);
+      setTotalPages(json.totalPages);
+    } catch (e) {
+      console.error('Error fetching chapter page:', e);
+    }
+  }, [novel?.id, chaptersPerPage]);
 
   useEffect(() => {
-    const fetchNovelAndChapters = async () => {
-      if (!id) return;
-      
-      try {
-        setLoading(true);
-        
-        // Fetch novel details - check if id is numeric (old ID) or string (new URL)
-        let query = supabase.from('novel').select('*');
-        
-        // Check if id is numeric (old ID) or string (new URL)
-        if (!isNaN(Number(id))) {
-          query = query.eq('id', id);
-        } else {
-          query = query.eq('url', id);
-        }
-        
-        const { data: novelData, error: novelError } = await query.single();
+    fetchNovel();
+  }, [fetchNovel]);
 
-        if (novelError) throw novelError;
-        
-        if (novelData) {
-          setNovel(novelData);
-          
-          // Track novel view
-          trackNovelView({
-            id: novelData.id,
-            name: novelData.name
-          });
-          
-          // Get total chapter count
-          const { count } = await supabase
-            .from('novel_chapter')
-            .select('id', { count: 'exact', head: true })
-            .eq('novel', novelData.id);  // Always use the numeric ID for chapter queries
-          
-          if (count !== null) {
-            setTotalChapters(count);
-          }
-
-          // Fetch first page of chapters directly without using fetchChapterPage
-          const from = 0;
-          const to = chaptersPerPage - 1;
-          
-          const { data: chaptersData } = await supabase
-            .from('novel_chapter')
-            .select('id, chapter, title')
-            .eq('novel', novelData.id)
-            .order('chapter', { ascending: true })
-            .range(from, to);
-          
-          if (chaptersData) {
-            setChapters(chaptersData);
-            setCurrentPage(1);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching novel details:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchNovelAndChapters();
-  }, [id, chaptersPerPage]);
-
-  // Calculate total pages
-  const totalPages = Math.ceil(totalChapters / chaptersPerPage);
+  useEffect(() => {
+    if (!novel?.id) return;
+    setCurrentPage(1);
+    fetchChapterPage(1);
+  }, [novel?.id, fetchChapterPage]);
 
   if (loading) {
     return (
@@ -137,20 +103,15 @@ export default function NovelDetail() {
     return (
       <div className="text-center py-10">
         <h1 className="text-2xl font-bold mb-4">Novel not found</h1>
-        <Link href="/" className="btn btn-primary">
-          Back to Home
-        </Link>
+        <Link href="/" className="btn btn-primary">Back to Home</Link>
       </div>
     );
   }
 
   const genres = formatList(novel.genre);
   const tags = formatList(novel.tag);
-  
-  // Generate canonical URL for this novel
+
   const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click'}/novel/${novel.url || novel.id}`;
-  
-  // Generate breadcrumb items
   const breadcrumbItems = [
     { name: 'Home', url: '/' },
     { name: novel.name, url: `/novel/${novel.url || novel.id}` }
@@ -158,25 +119,16 @@ export default function NovelDetail() {
 
   return (
     <>
-      <SEO 
+      <SEO
         title={`${novel.name} - Baca Novel Indo`}
         description={novel.description ?? `Baca novel ${novel.name} secara online di Baca Novel Indo.`}
         image={novel.cover ?? '/images/default-cover.jpg'}
         keywords={`${novel.name}, ${genres.join(', ')}, ${tags.join(', ')}, novel online`}
         article={true}
       />
-      
-      <JsonLd 
-        type="book" 
-        data={generateBookData(novel, canonicalUrl)}
-        id={`json-ld-book-${novel.id}`}
-      />
-      
-      <JsonLd 
-        type="breadcrumb" 
-        data={generateBreadcrumbData(breadcrumbItems)}
-        id={`json-ld-breadcrumb-${novel.id}`}
-      />
+
+      <JsonLd type="book" data={generateBookData(novel, canonicalUrl)} id={`json-ld-book-${novel.id}`} />
+      <JsonLd type="breadcrumb" data={generateBreadcrumbData(breadcrumbItems)} id={`json-ld-breadcrumb-${novel.id}`} />
       
       <div className="mb-8">
         <Link href="/" className="btn btn-ghost mb-4">
@@ -191,7 +143,7 @@ export default function NovelDetail() {
                 <div className="relative aspect-[3/4] rounded-lg overflow-hidden shadow-lg">
                   {novel.cover ? (
                     <Image
-                      src={getStorageUrl(novel.cover)}
+                      src={getCoverUrl(novel.cover)}
                       alt={`Cover of ${novel.name}`}
                       fill
                       className="object-cover"
@@ -258,11 +210,10 @@ export default function NovelDetail() {
           <div className="card-body p-4">
             {chapters.length > 0 ? (
               <>
-                {/* Chapter Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                   {chapters.map((chapter) => (
-                    <Link 
-                      key={chapter.id} 
+                    <Link
+                      key={chapter.id}
                       href={`/novel/${novel.url || novel.id}/chapter/${chapter.chapter}`}
                       className="card bg-base-200 hover:bg-base-300 transition-colors duration-200"
                     >
@@ -286,12 +237,11 @@ export default function NovelDetail() {
                   ))}
                 </div>
 
-                {/* Pagination */}
                 {totalPages > 1 && (
                   <div className="mt-6 pt-4 border-t border-base-300">
                     <div className="flex flex-col items-center gap-4">
                       <div className="join">
-                        <button 
+                        <button
                           className="join-item btn btn-sm"
                           onClick={() => fetchChapterPage(1)}
                           disabled={currentPage === 1}
@@ -299,7 +249,7 @@ export default function NovelDetail() {
                         >
                           «
                         </button>
-                        <button 
+                        <button
                           className="join-item btn btn-sm"
                           onClick={() => fetchChapterPage(Math.max(1, currentPage - 1))}
                           disabled={currentPage === 1}
@@ -307,13 +257,12 @@ export default function NovelDetail() {
                         >
                           ‹
                         </button>
-                        
-                        {/* Page Numbers */}
+
                         <div className="join-item btn btn-sm btn-disabled no-animation">
                           Page {currentPage} of {totalPages}
                         </div>
-                        
-                        <button 
+
+                        <button
                           className="join-item btn btn-sm"
                           onClick={() => fetchChapterPage(Math.min(totalPages, currentPage + 1))}
                           disabled={currentPage === totalPages}
@@ -321,7 +270,7 @@ export default function NovelDetail() {
                         >
                           ›
                         </button>
-                        <button 
+                        <button
                           className="join-item btn btn-sm"
                           onClick={() => fetchChapterPage(totalPages)}
                           disabled={currentPage === totalPages}
@@ -331,10 +280,9 @@ export default function NovelDetail() {
                         </button>
                       </div>
 
-                      {/* Quick Jump */}
                       <div className="flex items-center gap-2 text-sm">
                         <span>Jump to chapter:</span>
-                        <select 
+                        <select
                           className="select select-sm select-bordered w-24"
                           value={currentPage}
                           onChange={(e) => fetchChapterPage(Number(e.target.value))}
@@ -352,9 +300,6 @@ export default function NovelDetail() {
               </>
             ) : (
               <div className="text-center py-12">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 mx-auto text-base-content/30 mb-3">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                </svg>
                 <p className="text-base-content/70">No chapters available yet.</p>
               </div>
             )}
@@ -362,8 +307,7 @@ export default function NovelDetail() {
         </div>
       </div>
 
-      {/* Bagian Komentar */}
-      <CommentSection novelId={novel.id} />
+      {/* <CommentSection novelId={novel.id} /> */}
     </>
   );
-} 
+}

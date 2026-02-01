@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Novel, getStorageUrl } from '../lib/supabase';
+import { Novel, getCoverUrl } from '../lib/supabase';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
 type NovelCardProps = {
@@ -9,7 +9,7 @@ type NovelCardProps = {
 };
 
 export default function NovelCard({ novel, totalChapters = 0 }: NovelCardProps) {
-  const coverUrl = novel.cover ? getStorageUrl(novel.cover) : null;
+  const coverUrl = novel.cover ? getCoverUrl(novel.cover) : null;
   
   // Use URL if available, otherwise fallback to ID
   const novelLink = novel.url ? `/novel/${novel.url}` : `/novel/${novel.id}`;

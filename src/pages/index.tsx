@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import NovelCard from '../components/NovelCard';
-import { supabase, Novel } from '../lib/supabase';
+import { Novel } from '../lib/supabase';
 import SEO from '../components/SEO';
 import JsonLd from '../components/JsonLd';
 import { trackSearch } from '../lib/gtm';
@@ -17,7 +17,7 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobile, setIsMobile] = useState(false);
-  const [page, setPage] = useState(0);
+  const [cursor, setCursor] = useState<string | null>(null);
   const ITEMS_PER_PAGE = 12;
   
   const observer = useRef<IntersectionObserver | null>(null);
@@ -46,57 +46,40 @@ export default function Home() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const fetchNovels = async (currentPage: number) => {
+  type NovelsApiResponse = {
+    limit: number;
+    nextCursor: string | null;
+    data: NovelWithChapters[];
+  };
+
+  const fetchNovels = async (next?: string | null) => {
     try {
-      const offset = currentPage * ITEMS_PER_PAGE;
-      
-      if (currentPage === 0) {
+      if (!next) {
         setLoading(true);
+        setHasMore(true);
       } else {
         setLoadingMore(true);
       }
-      
-      // Fetch novels with total chapters count
-      const { data: novelsData, error: novelsError } = await supabase
-        .from('novel')
-        .select('*')
-        .order('updated_date', { ascending: false })
-        .range(offset, offset + ITEMS_PER_PAGE - 1);
 
-      if (novelsError) throw novelsError;
+      const url = next ? `/api/novels?cursor=${encodeURIComponent(next)}` : `/api/novels`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`API error: ${r.status}`);
 
-      if (novelsData) {
-        // Fetch total chapters count for each novel
-        const novelsWithChapters = await Promise.all(
-          novelsData.map(async (novel) => {
-            const { count, error: countError } = await supabase
-              .from('novel_chapter')
-              .select('id', { count: 'exact', head: true })
-              .eq('novel', novel.id);
+      const json = (await r.json()) as NovelsApiResponse;
 
-            if (countError) throw countError;
+      // nextCursor menentukan hasMore
+      setCursor(json.nextCursor);
+      setHasMore(Boolean(json.nextCursor));
 
-            return {
-              ...novel,
-              total_chapters: count || 0
-            };
-          })
-        );
-
-        if (novelsWithChapters.length < ITEMS_PER_PAGE) {
-          setHasMore(false);
-        }
-
-        if (currentPage === 0) {
-          setNovels(novelsWithChapters);
-          setFilteredNovels(novelsWithChapters);
-        } else {
-          setNovels(prev => [...prev, ...novelsWithChapters]);
-          setFilteredNovels(prev => [...prev, ...novelsWithChapters]);
-        }
+      if (!next) {
+        setNovels(json.data);
+        setFilteredNovels(json.data);
+      } else {
+        setNovels((prev) => [...prev, ...json.data]);
+        setFilteredNovels((prev) => [...prev, ...json.data]);
       }
     } catch (error) {
-      console.error('Error fetching novels:', error);
+      console.error("Error fetching novels:", error);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -105,15 +88,12 @@ export default function Home() {
 
   const loadMoreNovels = () => {
     if (!loadingMore && hasMore && !searchTerm) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchNovels(nextPage);
+      if (cursor) fetchNovels(cursor);
     }
   };
 
   useEffect(() => {
-    // Mulai dengan halaman pertama
-    fetchNovels(0);
+    fetchNovels(null);
   }, []);
 
   useEffect(() => {
