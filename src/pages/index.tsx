@@ -61,7 +61,24 @@ export default function Home() {
         setLoadingMore(true);
       }
 
-      const url = next ? `/api/novels?cursor=${encodeURIComponent(next)}` : `/api/novels`;
+      // ambil isHidden dari localStorage (client-only)
+      let isHidden: string | null = null;
+      if (typeof window !== "undefined") {
+        isHidden = window.localStorage.getItem("isHidden"); // expected "0" | "1"
+      }
+
+      const params = new URLSearchParams();
+
+      if (next) params.set("cursor", next);
+
+      // hanya tambahkan kalau key ada dan valuenya valid
+      if (isHidden === "0" || isHidden === "1") {
+        params.set("isHidden", isHidden);
+      }
+
+      const qs = params.toString();
+      const url = qs ? `/api/novels?${qs}` : `/api/novels`;
+      
       const r = await fetch(url);
       if (!r.ok) throw new Error(`API error: ${r.status}`);
 

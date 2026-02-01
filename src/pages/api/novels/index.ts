@@ -22,6 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // cursor = last seen id (numeric). Uses keyset pagination.
     const cursorRaw = typeof req.query.cursor === "string" ? req.query.cursor : "";
     const cursor = cursorRaw && /^\d+$/.test(cursorRaw) ? cursorRaw : null;
+    
+    const isHiddenRaw = typeof req.query.isHidden === "string" ? req.query.isHidden : "0";
+    const isHidden = isHiddenRaw && /^\d+$/.test(isHiddenRaw) ? isHiddenRaw : null;
 
     const sql = cursor
       ? `
@@ -38,7 +41,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         FROM public.novel n
         LEFT JOIN public.novel_chapter c
           ON c.novel = n.id
-        WHERE n.id < $1
+        WHERE is_hidden = $1
+        and n.id < $2
         GROUP BY n.id
         ORDER BY n.updated_date DESC
         LIMIT ${limit}
@@ -57,6 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         FROM public.novel n
         LEFT JOIN public.novel_chapter c
           ON c.novel = n.id
+        WHERE is_hidden = $1
         GROUP BY n.id
         ORDER BY n.updated_date DESC
         LIMIT ${limit}
@@ -64,8 +69,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `;
 
     const result = cursor
-      ? await pool.query<NovelRow>(sql, [cursor])
-      : await pool.query<NovelRow>(sql);
+      ? await pool.query<NovelRow>(sql, [isHidden, cursor])
+      : await pool.query<NovelRow>(sql, [isHidden]);
 
     const nextCursor = result.rows.length ? result.rows[result.rows.length - 1].id : null;
 
