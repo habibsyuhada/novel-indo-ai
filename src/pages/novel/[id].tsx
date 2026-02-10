@@ -53,6 +53,11 @@ export default function NovelDetail() {
       setNovel(novelData);
 
       trackNovelView({ id: novelData.id, name: novelData.name });
+
+      // 🔥 TAMBAHAN: panggil API increment views
+      fetch(`/api/novels/${novelData.id}/view`, {
+        method: "POST",
+      }).catch((err) => console.error("Failed to update view:", err));
     } catch (e) {
       console.error('Error fetching novel details:', e);
       setNovel(null);

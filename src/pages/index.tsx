@@ -17,7 +17,7 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobile, setIsMobile] = useState(false);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [page, setPage] = useState<number>(1);
   const ITEMS_PER_PAGE = 12;
   
   const observer = useRef<IntersectionObserver | null>(null);
@@ -48,55 +48,49 @@ export default function Home() {
 
   type NovelsApiResponse = {
     limit: number;
-    nextCursor: string | null;
+    page: number;
+    nextPage: number | null;
     data: NovelWithChapters[];
   };
 
-  const fetchNovels = async (next?: string | null) => {
+
+  const fetchNovels = async (nextPage?: number | null) => {
     try {
-      if (!next) {
+      if (!nextPage) {
         setLoading(true);
         setHasMore(true);
+        setPage(1);
       } else {
         setLoadingMore(true);
       }
 
-      // ambil isHidden dari localStorage (client-only)
       let isHidden: string | null = null;
       if (typeof window !== "undefined") {
-        isHidden = window.localStorage.getItem("isHidden"); // expected "0" | "1"
+        isHidden = window.localStorage.getItem("isHidden");
       }
 
       const params = new URLSearchParams();
+      const p = nextPage ?? 1;
+      params.set("page", String(p));
 
-      if (next) params.set("cursor", next);
+      if (isHidden === "0" || isHidden === "1") params.set("isHidden", isHidden);
 
-      // hanya tambahkan kalau key ada dan valuenya valid
-      if (isHidden === "0" || isHidden === "1") {
-        params.set("isHidden", isHidden);
-      }
-
-      const qs = params.toString();
-      const url = qs ? `/api/novels?${qs}` : `/api/novels`;
-      
+      const url = `/api/novels?${params.toString()}`;
       const r = await fetch(url);
       if (!r.ok) throw new Error(`API error: ${r.status}`);
 
       const json = (await r.json()) as NovelsApiResponse;
 
-      // nextCursor menentukan hasMore
-      setCursor(json.nextCursor);
-      setHasMore(Boolean(json.nextCursor));
+      setHasMore(Boolean(json.nextPage));
+      setPage(json.page);
 
-      if (!next) {
+      if (!nextPage) {
         setNovels(json.data);
         setFilteredNovels(json.data);
       } else {
         setNovels((prev) => [...prev, ...json.data]);
         setFilteredNovels((prev) => [...prev, ...json.data]);
       }
-    } catch (error) {
-      console.error("Error fetching novels:", error);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -105,7 +99,7 @@ export default function Home() {
 
   const loadMoreNovels = () => {
     if (!loadingMore && hasMore && !searchTerm) {
-      if (cursor) fetchNovels(cursor);
+      fetchNovels(page + 1);
     }
   };
 

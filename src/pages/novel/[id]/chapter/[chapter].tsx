@@ -104,6 +104,19 @@ export default function ChapterPage() {
     }
   }, [isPlaying, isPaused, currentText, paragraphs, currentParagraphIndex, startSpeaking, pauseSpeaking, resumeSpeaking, isAutoPlaying]);
   
+  useEffect(() => {
+    if (!novel) return;
+
+    // Update view for novel
+    fetch(`/api/novels/${novel.id}/view`, {
+      method: "POST",
+    }).catch((err) => {
+      console.error("Gagal update novel view:", err);
+    });
+    
+  }, [novel?.id]);
+
+
   // Auto-start TTS when navigating to a new chapter via auto-play
   useEffect(() => {
     // Skip jika sudah dihandle, masih loading, atau data tidak lengkap

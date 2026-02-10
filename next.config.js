@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "standalone",
   reactStrictMode: true,
   // eslint: { ignoreDuringBuilds: true },
   // typescript: { ignoreBuildErrors: true },
@@ -8,52 +9,31 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "storage.bacanovelindo.click",
-        port: "",
         pathname: "/novel-covers/**",
       },
     ],
     unoptimized: true,
   },
-  headers: async () => {
+
+  async headers() {
     return [
       {
-        source: '/sw.js',
+        source: "/sw.js",
         headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=0, must-revalidate',
-          },
-          {
-            key: 'Service-Worker-Allowed',
-            value: '/',
-          },
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
         ],
       },
       {
-        source: '/(.*)',
+        source: "/(.*)",
         headers: [
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-XSS-Protection", value: "1; mode=block" },
         ],
-      }
+      },
     ];
   },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.output.publicPath = '/_next/';
-    }
-    return config;
-  }
 };
 
 module.exports = nextConfig;

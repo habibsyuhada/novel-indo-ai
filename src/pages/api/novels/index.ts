@@ -19,66 +19,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const limit = 12;
 
-    // cursor = last seen id (numeric). Uses keyset pagination.
-    const cursorRaw = typeof req.query.cursor === "string" ? req.query.cursor : "";
-    const cursor = cursorRaw && /^\d+$/.test(cursorRaw) ? cursorRaw : null;
-    
+    const pageRaw = typeof req.query.page === "string" ? req.query.page : "1";
+    const page = /^\d+$/.test(pageRaw) ? Math.max(parseInt(pageRaw, 10), 1) : 1;
+
+    const offset = (page - 1) * limit;
+
     const isHiddenRaw = typeof req.query.isHidden === "string" ? req.query.isHidden : "0";
-    const isHidden = isHiddenRaw && /^\d+$/.test(isHiddenRaw) ? isHiddenRaw : null;
+    const isHidden = (isHiddenRaw === "0" || isHiddenRaw === "1") ? isHiddenRaw : "0";
 
-    const sql = cursor
-      ? `
-        SELECT
-          n.id,
-          n.name,
-          n.tag,
-          n.genre,
-          n.cover,
-          n.url,
-          n.status,
-          n.updated_date,
-          COUNT(c.id)::int AS total_chapters
-        FROM public.novel n
-        LEFT JOIN public.novel_chapter c
-          ON c.novel = n.id
-        WHERE is_hidden = $1
-        and n.id < $2
-        GROUP BY n.id
-        ORDER BY n.updated_date DESC
-        LIMIT ${limit}
-      `
-      : `
-        SELECT
-          n.id,
-          n.name,
-          n.tag,
-          n.genre,
-          n.cover,
-          n.url,
-          n.status,
-          n.updated_date,
-          COUNT(c.id)::int AS total_chapters
-        FROM public.novel n
-        LEFT JOIN public.novel_chapter c
-          ON c.novel = n.id
-        WHERE is_hidden = $1
-        GROUP BY n.id
-        ORDER BY n.updated_date DESC
-        LIMIT ${limit}
+    const sql = `
+      SELECT
+        n.id,
+        n.name,
+        n.tag,
+        n.genre,
+        n.cover,
+        n.url,
+        n.status,
+        n.updated_date,
+        COUNT(c.id)::int AS total_chapters
+      FROM public.novel n
+      LEFT JOIN public.novel_chapter c ON c.novel = n.id
+      WHERE n.is_hidden = $1
+      GROUP BY n.id
+      ORDER BY n.updated_date DESC
+      LIMIT $2 OFFSET $3
+    `;
 
-      `;
+    const result = await pool.query<NovelRow>(sql, [isHidden, limit, offset]);
 
-    const result = cursor
-      ? await pool.query<NovelRow>(sql, [isHidden, cursor])
-      : await pool.query<NovelRow>(sql, [isHidden]);
-
-    const nextCursor = result.rows.length ? result.rows[result.rows.length - 1].id : null;
-
+    const hasMore = result.rows.length === limit;
     return res.status(200).json({
       limit,
-      nextCursor,
+      page,
+      nextPage: hasMore ? page + 1 : null,
       data: result.rows,
     });
+
   } catch (err: any) {
     return res.status(500).json({ error: err?.message ?? "server error", code: err?.code });
   }
