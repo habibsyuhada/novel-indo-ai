@@ -17,6 +17,16 @@ export function getCoverUrl(cover?: string | null) {
   return `${cleanBase}/novel-covers/${cleanCover}`;
 }
 
+export function getIllustrationUrl(novelUrl?: string | null, cover?: string | null) {
+  const base = storage_url ?? "https://storage.bacanovelindo.click";
+  const cleanBase = base.replace(/\/$/, "");
+
+  if (!cover) return "/images/placeholder-cover.png"; // taruh file ini di /public/images/
+  const cleanCover = cover.replace(/^\//, "");
+
+  return `${cleanBase}/novel-illustration/${novelUrl}/${cleanCover}`;
+}
+
 export type Novel = {
   id: number;
   name: string;

@@ -1,8 +1,9 @@
 import { useRef, useEffect } from 'react';
-import { Novel, NovelChapter } from '../../lib/supabase';
+import { Novel, NovelChapter, getIllustrationUrl } from '../../lib/supabase';
 import styles from '../../styles/chapter.module.css';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
+import Image from 'next/image';
 
 interface ChapterContentProps {
   novel: Novel;
@@ -84,24 +85,49 @@ const ChapterContent = ({
 				<p>
 					Chapter {chapterData.chapter}
 				</p>
-        {paragraphs.map((paragraph: string, index: number) => (
-          <p 
-            key={index}
-            ref={(el: HTMLParagraphElement | null) => {
-              paragraphRefs.current[index] = el;
-            }}
-            className={`mb-4 ${ttsEnabled && currentParagraphIndex === index && isPlaying ? 'bg-primary/50 transition-colors duration-200' : ''} ${ttsEnabled && isPlaying ? 'cursor-pointer hover:bg-primary/10' : ''}`}
-            tabIndex={0}
-            onClick={() => {
-              if (ttsEnabled && index !== currentParagraphIndex) {
-                onParagraphClick(paragraph, index);
-              }
-            }}
-            title={ttsEnabled ? "Klik untuk mulai membaca dari paragraf ini" : ""}
-          >
-            {paragraph}
-          </p>
-        ))}
+        {paragraphs.map((paragraph: string, index: number) => {
+          const imgMatch = paragraph.trim().match(/^\[IMG:(.*?)(?:\|(.*?))?\]$/);
+          if (imgMatch) {
+          const illustrationUrl = imgMatch ? getIllustrationUrl(novel.url, imgMatch[1]) : null;
+            return (
+              <figure key={index} className="my-6 flex flex-col items-center">
+                {illustrationUrl ? (
+                  <Image
+                    src={illustrationUrl}
+                    alt={imgMatch[2] || 'Ilustrasi chapter'}
+                    width={800}
+                    height={450}
+                    className="max-w-full h-auto rounded"
+                    loading="lazy"
+                  />
+                ) : null}
+                {imgMatch[2] && (
+                  <figcaption className="text-sm text-muted-foreground mt-2 text-center">
+                    {imgMatch[2]}
+                  </figcaption>
+                )}
+              </figure>
+            );
+          }
+          return (
+            <p
+              key={index}
+              ref={(el: HTMLParagraphElement | null) => {
+                paragraphRefs.current[index] = el;
+              }}
+              className={`mb-4 ${ttsEnabled && currentParagraphIndex === index && isPlaying ? 'bg-primary/50 transition-colors duration-200' : ''} ${ttsEnabled && isPlaying ? 'cursor-pointer hover:bg-primary/10' : ''}`}
+              tabIndex={0}
+              onClick={() => {
+                if (ttsEnabled && index !== currentParagraphIndex) {
+                  onParagraphClick(paragraph, index);
+                }
+              }}
+              title={ttsEnabled ? "Klik untuk mulai membaca dari paragraf ini" : ""}
+            >
+              {paragraph}
+            </p>
+          );
+        })}
       </section>
     </article>
   );

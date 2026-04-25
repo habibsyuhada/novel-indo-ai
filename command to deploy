@@ -6,7 +6,7 @@ tar -czf nextapp.tgz .next/standalone
 cd /opt/bacanovelindo/release/
 ls -la
 tar -xzf nextapp.tgz
-ln -sfn /opt/bacanovelindo/release/v2 /opt/bacanovelindo/current
+ln -sfn /opt/bacanovelindo/release/v4 /opt/bacanovelindo/current
 pm2 start /opt/bacanovelindo/shared/ecosystem.config.js
 pm2 reload /opt/bacanovelindo/shared/ecosystem.config.js --only bacanovelindo --update-env
 pm2 list

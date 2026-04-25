@@ -18,7 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const chapterNum = typeof req.query.chapter === "string" ? req.query.chapter : "";
 
   if (!/^\d+$/.test(novelId)) return res.status(400).json({ error: "invalid novel id" });
-  if (!/^\d+$/.test(chapterNum)) return res.status(400).json({ error: "invalid chapter" });
+  // if (!/^\d+$/.test(chapterNum)) return res.status(400).json({ error: "invalid chapter" });
+  if (!/^\d+(\.\d+)?$/.test(chapterNum)) return res.status(400).json({ error: "invalid chapter" });
 
   try {
     // current chapter
