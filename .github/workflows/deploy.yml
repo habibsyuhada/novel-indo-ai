@@ -59,5 +59,8 @@ jobs:
           # Menggunakan variabel env.DEPLOY_DIR dan env.APP_NAME langsung di dalam script
           script: |
             cd ${{ env.DEPLOY_DIR }}
+            
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
+            
             pm2 restart ${{ env.APP_NAME }} || PORT=3000 pm2 start server.js --name "${{ env.APP_NAME }}"
             pm2 save
