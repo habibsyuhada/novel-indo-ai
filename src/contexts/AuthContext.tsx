@@ -1,8 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AuthState, User } from '@/types/user';
 
+type SignUpResult = { success: boolean; message?: string };
+
 type AuthContextValue = AuthState & {
-  signUp: (email: string, password: string, name: string) => Promise<boolean>;
+  signUp: (email: string, password: string, name: string, turnstileToken: string) => Promise<SignUpResult>;
   signIn: (email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
 };
@@ -14,6 +16,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: null,
     loading: true,
     error: null,
+    needsVerification: false,
   });
 
   useEffect(() => {
@@ -23,11 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((r) => r.json())
       .then((data: { user: User | null }) => {
         if (cancelled) return;
-        setAuthState({ user: data.user, loading: false, error: null });
+        setAuthState({ user: data.user, loading: false, error: null, needsVerification: false });
       })
       .catch(() => {
         if (cancelled) return;
-        setAuthState({ user: null, loading: false, error: null });
+        setAuthState({ user: null, loading: false, error: null, needsVerification: false });
       });
 
     return () => {
@@ -35,27 +38,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, name: string): Promise<boolean> => {
-    setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+  const signUp = useCallback(async (email: string, password: string, name: string, turnstileToken: string): Promise<SignUpResult> => {
+    setAuthState((prev) => ({ ...prev, loading: true, error: null, needsVerification: false }));
     try {
       const r = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name, turnstileToken }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error ?? 'Gagal mendaftar');
 
-      setAuthState({ user: data.user, loading: false, error: null });
-      return true;
+      setAuthState({ user: null, loading: false, error: null, needsVerification: false });
+      return { success: true, message: data.message };
     } catch (error: any) {
       setAuthState((prev) => ({ ...prev, loading: false, error: error.message }));
-      return false;
+      return { success: false };
     }
   }, []);
 
   const signIn = useCallback(async (email: string, password: string): Promise<boolean> => {
-    setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+    setAuthState((prev) => ({ ...prev, loading: true, error: null, needsVerification: false }));
     try {
       const r = await fetch('/api/auth/login', {
         method: 'POST',
@@ -63,9 +66,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error ?? 'Gagal masuk');
+      if (!r.ok) {
+        setAuthState((prev) => ({
+          ...prev,
+          loading: false,
+          error: data.error ?? 'Gagal masuk',
+          needsVerification: data.code === 'EMAIL_NOT_VERIFIED',
+        }));
+        return false;
+      }
 
-      setAuthState({ user: data.user, loading: false, error: null });
+      setAuthState({ user: data.user, loading: false, error: null, needsVerification: false });
       return true;
     } catch (error: any) {
       setAuthState((prev) => ({ ...prev, loading: false, error: error.message }));
@@ -77,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      setAuthState({ user: null, loading: false, error: null });
+      setAuthState({ user: null, loading: false, error: null, needsVerification: false });
     } catch (error: any) {
       setAuthState((prev) => ({ ...prev, loading: false, error: error.message }));
     }

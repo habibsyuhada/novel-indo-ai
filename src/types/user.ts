@@ -8,4 +8,5 @@ export type AuthState = {
   user: User | null;
   loading: boolean;
   error: string | null;
+  needsVerification: boolean;
 };

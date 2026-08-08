@@ -14,8 +14,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
-    const result = await pool.query<{ id: string; email: string; name: string | null; password_hash: string }>(
-      "SELECT id, email, name, password_hash FROM app_user WHERE email = $1",
+    const result = await pool.query<{ id: string; email: string; name: string | null; password_hash: string; email_verified: boolean }>(
+      "SELECT id, email, name, password_hash, email_verified FROM app_user WHERE email = $1",
       [normalizedEmail]
     );
 
@@ -27,6 +27,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const valid = await verifyPassword(password, row.password_hash);
     if (!valid) {
       return res.status(401).json({ error: "Email atau password salah" });
+    }
+
+    if (!row.email_verified) {
+      return res.status(403).json({
+        error: "Email belum diverifikasi. Cek inbox kamu atau kirim ulang link verifikasi.",
+        code: "EMAIL_NOT_VERIFIED",
+      });
     }
 
     const user = { id: row.id, email: row.email, name: row.name };
