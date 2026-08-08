@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { X } from 'lucide-react';
+import { X, CheckCircle2 } from 'lucide-react';
 
 interface ChapterItem {
   chapter: number;
@@ -155,18 +155,22 @@ const ChapterList = ({
           
           <div className="overflow-y-auto flex-1 p-2">
             <ul className="menu menu-compact w-full">
-              {chapterList.map((item) => (
-                <li key={item.chapter}>
-                  <Link 
-                    href={`/novel/${novelUrl || novelId}/chapter/${item.chapter}`}
-                    className={parseInt(currentChapter as string) === item.chapter ? "active" : ""}
-                    onClick={onClose}
-                  >
-                    <span className="font-medium">Chapter {item.chapter}</span>
-                    <span className="text-sm truncate">{item.title}</span>
-                  </Link>
-                </li>
-              ))}
+              {chapterList.map((item) => {
+                const isCurrent = Number(item.chapter) === parseFloat(currentChapter as string);
+                return (
+                  <li key={item.chapter}>
+                    <Link
+                      href={`/novel/${novelUrl || novelId}/chapter/${item.chapter}`}
+                      className={isCurrent ? "active font-semibold" : ""}
+                      onClick={onClose}
+                    >
+                      {isCurrent && <CheckCircle2 className="w-4 h-4 flex-none" />}
+                      <span className="font-medium">Chapter {item.chapter}</span>
+                      <span className="text-sm truncate">{item.title}</span>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           </div>
           

@@ -394,6 +394,8 @@ export default function ChapterPage() {
           isMobile={true}
           onListClick={() => setShowChapterList(true)}
           onSettingsClick={() => dispatch(toggleSettings())}
+          onMarkAsRead={handleMarkAsRead}
+          justMarked={justMarked}
         />
       )}
 
