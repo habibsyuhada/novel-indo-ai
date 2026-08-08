@@ -18,7 +18,8 @@ const SORT_OPTIONS: Record<string, string> = {
   title_asc: "lower(n.name) ASC",
   title_desc: "lower(n.name) DESC",
   views: "n.total_view DESC NULLS LAST",
-  trending: "n.total_month_view DESC NULLS LAST",
+  trending:
+    "CASE WHEN n.month_view IS NOT NULL AND date_trunc('month', n.month_view) = date_trunc('month', now()) THEN n.total_month_view ELSE 0 END DESC NULLS LAST",
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
