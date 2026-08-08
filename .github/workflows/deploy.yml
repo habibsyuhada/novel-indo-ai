@@ -29,10 +29,10 @@ jobs:
       - name: Build Next.js
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXT_PUBLIC_STORAGE_URL: ${{ secrets.NEXT_PUBLIC_STORAGE_URL }}
+          NEXT_PUBLIC_GTM_ID: ${{ secrets.NEXT_PUBLIC_GTM_ID }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
       - name: Prepare Standalone Output
         run: |
@@ -59,8 +59,14 @@ jobs:
           # Menggunakan variabel env.DEPLOY_DIR dan env.APP_NAME langsung di dalam script
           script: |
             cd ${{ env.DEPLOY_DIR }}
-            
+
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
-            
-            pm2 restart ${{ env.APP_NAME }} || PORT=3000 pm2 start server.js --name "${{ env.APP_NAME }}"
+            echo "NEXT_PUBLIC_STORAGE_URL=${{ secrets.NEXT_PUBLIC_STORAGE_URL }}" >> .env
+            echo "NEXT_PUBLIC_GTM_ID=${{ secrets.NEXT_PUBLIC_GTM_ID }}" >> .env
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+
+            # Selalu (re)start dari server.js standalone, jangan pakai "pm2 restart"
+            # karena proses lama mungkin masih terdaftar dengan start command "npm start".
+            pm2 delete "${{ env.APP_NAME }}" || true
+            PORT=3000 pm2 start server.js --name "${{ env.APP_NAME }}"
             pm2 save

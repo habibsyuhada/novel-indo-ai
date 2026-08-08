@@ -2,11 +2,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Novel, getCoverUrl } from '../../lib/supabase';
+import { Novel, getCoverUrl } from '../../lib/novel';
 import SEO from '../../components/SEO';
 import JsonLd, { generateBookData, generateBreadcrumbData } from '../../components/JsonLd';
 import { trackNovelView } from '../../lib/gtm';
-// import CommentSection from '../../components/CommentSection';
+import { useAuth } from '../../hooks/useAuth';
+import { BookmarkCheck } from 'lucide-react';
 
 type ChapterListItem = {
   id: number;
@@ -33,6 +34,9 @@ export default function NovelDetail() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalChapters, setTotalChapters] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+
+  const { user } = useAuth();
+  const [lastReadChapter, setLastReadChapter] = useState<number | null>(null);
 
   const chaptersPerPage = 50;
 
@@ -95,6 +99,18 @@ export default function NovelDetail() {
     setCurrentPage(1);
     fetchChapterPage(1);
   }, [novel?.id, fetchChapterPage]);
+
+  useEffect(() => {
+    if (!novel?.id || !user) {
+      setLastReadChapter(null);
+      return;
+    }
+
+    fetch(`/api/reading-progress?novelId=${novel.id}`)
+      .then((r) => r.json())
+      .then((data: { chapter: number | null }) => setLastReadChapter(data.chapter ?? null))
+      .catch((e) => console.error('Gagal mengambil checkpoint:', e));
+  }, [novel?.id, user]);
 
   if (loading) {
     return (
@@ -211,6 +227,16 @@ export default function NovelDetail() {
           <span className="text-sm text-base-content/70">Total: {totalChapters} chapters</span>
         </div>
 
+        {lastReadChapter !== null && (
+          <Link
+            href={`/novel/${novel.url || novel.id}/chapter/${lastReadChapter}`}
+            className="btn btn-primary w-full mb-4"
+          >
+            <BookmarkCheck className="w-5 h-5" />
+            Lanjutkan Membaca — Chapter {lastReadChapter}
+          </Link>
+        )}
+
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body p-4">
             {chapters.length > 0 ? (
@@ -312,7 +338,6 @@ export default function NovelDetail() {
         </div>
       </div>
 
-      {/* <CommentSection novelId={novel.id} /> */}
     </>
   );
 }

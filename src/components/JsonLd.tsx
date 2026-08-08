@@ -1,4 +1,4 @@
-import { Novel } from '../lib/supabase';
+import { Novel } from '../lib/novel';
 import { useEffect, useState } from 'react';
 import Script from 'next/script';
 

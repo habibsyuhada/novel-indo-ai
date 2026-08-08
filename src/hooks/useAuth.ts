@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { AuthState } from '@/types/user';
+import { useState, useEffect, useCallback } from 'react';
+import { AuthState, User } from '@/types/user';
 
 export const useAuth = () => {
   const [authState, setAuthState] = useState<AuthState>({
@@ -10,72 +9,71 @@ export const useAuth = () => {
   });
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setAuthState({
-        user: session?.user ?? null,
-        loading: false,
-        error: null,
-      });
-    });
+    let cancelled = false;
 
-    // Listen for changes on auth state (sign in, sign out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthState({
-        user: session?.user ?? null,
-        loading: false,
-        error: null,
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((data: { user: User | null }) => {
+        if (cancelled) return;
+        setAuthState({ user: data.user, loading: false, error: null });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAuthState({ user: null, loading: false, error: null });
       });
-    });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const signUp = async (email: string, password: string): Promise<boolean> => {
+  const signUp = useCallback(async (email: string, password: string): Promise<boolean> => {
+    setAuthState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
+      const r = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
-      if (error) throw error;
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? 'Gagal mendaftar');
+
+      setAuthState({ user: data.user, loading: false, error: null });
       return true;
     } catch (error: any) {
-      setAuthState(prev => ({ ...prev, error: error.message }));
+      setAuthState((prev) => ({ ...prev, loading: false, error: error.message }));
       return false;
-    } finally {
-      setAuthState(prev => ({ ...prev, loading: false }));
     }
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string): Promise<boolean> => {
+  const signIn = useCallback(async (email: string, password: string): Promise<boolean> => {
+    setAuthState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const r = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
-      if (error) throw error;
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? 'Gagal masuk');
+
+      setAuthState({ user: data.user, loading: false, error: null });
       return true;
     } catch (error: any) {
-      setAuthState(prev => ({ ...prev, error: error.message }));
+      setAuthState((prev) => ({ ...prev, loading: false, error: error.message }));
       return false;
-    } finally {
-      setAuthState(prev => ({ ...prev, loading: false }));
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
+    setAuthState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setAuthState({ user: null, loading: false, error: null });
     } catch (error: any) {
-      setAuthState(prev => ({ ...prev, error: error.message }));
-    } finally {
-      setAuthState(prev => ({ ...prev, loading: false }));
+      setAuthState((prev) => ({ ...prev, loading: false, error: error.message }));
     }
-  };
+  }, []);
 
   return {
     ...authState,
@@ -83,4 +81,4 @@ export const useAuth = () => {
     signIn,
     signOut,
   };
-}; 
+};

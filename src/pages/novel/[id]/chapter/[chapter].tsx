@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useDispatch, useSelector } from 'react-redux';
@@ -9,6 +9,7 @@ import { toggleSettings } from '../../../../store/settingsSlice';
 import useChapterData from '../../../../hooks/useChapterData';
 import useTts from '../../../../hooks/useTts';
 import useReadingProgress from '../../../../hooks/useReadingProgress';
+import { useAuth } from '../../../../hooks/useAuth';
 
 // Components
 import SEO from '../../../../components/SEO';
@@ -18,7 +19,6 @@ import ChapterList from '../../../../components/chapter/ChapterList';
 import Navigation from '../../../../components/chapter/Navigation';
 import TtsControls from '../../../../components/chapter/TtsControls';
 import AutoPlayCountdown from '../../../../components/chapter/AutoPlayCountdown';
-// import CommentSection from '../../../../components/CommentSection';
 
 export default function ChapterPage() {
   const router = useRouter();
@@ -48,11 +48,18 @@ export default function ChapterPage() {
     fetchChapterPage
   } = useChapterData({ id, chapter, chaptersPerPage });
   
-  // Reading progress
+  // Reading progress (scroll indicator)
   const readingProgress = useReadingProgress({ contentElement });
-  
+
+  // Reading checkpoint (last chapter read)
+  const { user } = useAuth();
+  const [justMarked, setJustMarked] = useState(false);
+
   // TTS functionality
-  const paragraphs = chapterData?.text.split('\n').filter(p => p.trim() !== '') || [];
+  const paragraphs = useMemo(
+    () => chapterData?.text.split('\n').filter(p => p.trim() !== '') || [],
+    [chapterData]
+  );
   
   // Handle chapter end for auto-play
   const handleChapterEnd = useCallback(() => {
@@ -113,9 +120,37 @@ export default function ChapterPage() {
     }).catch((err) => {
       console.error("Gagal update novel view:", err);
     });
-    
-  }, [novel?.id]);
 
+  }, [novel]);
+
+  // Auto-save reading checkpoint: chapter yang sedang dibuka jadi "last chapter read"
+  useEffect(() => {
+    if (!novel || !chapterData || !user) return;
+
+    fetch('/api/reading-progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ novelId: novel.id, chapter: chapterData.chapter }),
+    }).catch((err) => {
+      console.error('Gagal menyimpan checkpoint:', err);
+    });
+  }, [novel, chapterData, user]);
+
+  // Tandai manual chapter ini sebagai chapter terakhir dibaca
+  const handleMarkAsRead = useCallback(() => {
+    if (!novel || !chapterData) return;
+
+    fetch('/api/reading-progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ novelId: novel.id, chapter: chapterData.chapter }),
+    })
+      .then(() => {
+        setJustMarked(true);
+        setTimeout(() => setJustMarked(false), 2000);
+      })
+      .catch((err) => console.error('Gagal menandai chapter:', err));
+  }, [novel, chapterData]);
 
   // Auto-start TTS when navigating to a new chapter via auto-play
   useEffect(() => {
@@ -159,7 +194,7 @@ export default function ChapterPage() {
       // Panggil fungsi async
       startTtsWithDelay();
     }
-  }, [chapterData, paragraphs, ttsEnabled, startSpeaking, loading]);
+  }, [chapterData, paragraphs, ttsEnabled, startSpeaking, loading, handlePlayPause, stopSpeaking]);
   
   // Reset auto-play handled flag when chapter changes
   useEffect(() => {
@@ -327,21 +362,14 @@ export default function ChapterPage() {
                 isMobile={false}
                 onListClick={() => setShowChapterList(true)}
                 onSettingsClick={() => dispatch(toggleSettings())}
+                onMarkAsRead={handleMarkAsRead}
+                justMarked={justMarked}
               />
             )}
           </div>
         </div>
       </div>
       
-      {/* Bagian Komentar - dipindahkan ke luar dari ChapterContent */}
-      {/* {chapterData && novel && (
-        <div className="card bg-base-100 shadow-xl mb-6">
-          <div className="card-body p-3 md:p-6">
-            <CommentSection chapterId={chapterData.id} novelId={novel.id} />
-          </div>
-        </div>
-      )} */}
-
       {/* TTS Controls */}
       <TtsControls 
         ttsEnabled={ttsEnabled}

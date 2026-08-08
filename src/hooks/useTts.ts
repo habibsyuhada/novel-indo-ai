@@ -37,6 +37,7 @@ export const useTts = ({
   const speechSynthesisRef = useRef<SpeechSynthesis | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [noSleep, setNoSleep] = useState<any>(null);
+  const noSleepRef = useRef<any>(null);
 
   // Initialize speech synthesis
   useEffect(() => {
@@ -50,8 +51,9 @@ export const useTts = ({
     if (typeof window !== 'undefined') {
       import('nosleep.js').then((NoSleepModule) => {
         const noSleepInstance = new NoSleepModule.default();
+        noSleepRef.current = noSleepInstance;
         setNoSleep(noSleepInstance);
-        
+
         // Langsung cek pengaturan ttsNoSleep begitu NoSleep terinisialisasi
         const { ttsNoSleep } = store.getState().settings;
         if (ttsNoSleep) {
@@ -61,11 +63,9 @@ export const useTts = ({
         console.error('Failed to load NoSleep module:', err);
       });
     }
-    
+
     return () => {
-      if (noSleep) {
-        noSleep.disable();
-      }
+      noSleepRef.current?.disable();
     };
   }, []);
 
@@ -320,7 +320,7 @@ export const useTts = ({
 
     speakNextChunk();
     setCurrentParagraphIndex(index);
-  }, [enabled, paragraphs, updateCurrentParagraph, handleChapterEnd, isAutoPlaying]);
+  }, [enabled, paragraphs, updateCurrentParagraph, handleChapterEnd, isAutoPlaying, hasNextChapter]);
 
   const pauseSpeaking = useCallback(() => {
     if (speechSynthesisRef.current) {
