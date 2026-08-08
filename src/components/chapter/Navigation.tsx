@@ -1,15 +1,18 @@
 import Link from 'next/link';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Home, 
-  List, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Home,
+  List,
   Settings,
   ArrowLeft,
   ArrowRight,
-  BookOpen
+  BookOpen,
+  Bookmark,
+  BookmarkCheck
 } from 'lucide-react';
-import { Novel } from '../../lib/supabase';
+import { Novel } from '../../lib/novel';
+import { useAuth } from '../../hooks/useAuth';
 
 interface NavProps {
   prevChapter: number | null;
@@ -17,6 +20,8 @@ interface NavProps {
   novel: Novel;
   onListClick: () => void;
   onSettingsClick: () => void;
+  onMarkAsRead?: () => void;
+  justMarked?: boolean;
 }
 
 interface NavigationProps extends NavProps {
@@ -28,8 +33,11 @@ const DesktopNavigation = ({
   nextChapter,
   novel,
   onListClick,
-  onSettingsClick
+  onSettingsClick,
+  onMarkAsRead,
+  justMarked
 }: NavProps) => {
+  const { user } = useAuth();
   return (
     <div className="w-12 flex-none">
       <div className="fixed flex flex-col gap-2 p-2 bg-base-200 rounded-l-xl shadow-lg right-0">
@@ -80,7 +88,7 @@ const DesktopNavigation = ({
           </div>
 
           <div className="flex justify-between items-center">
-            <button 
+            <button
               onClick={onSettingsClick}
               className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
               aria-label="Buka pengaturan"
@@ -89,6 +97,23 @@ const DesktopNavigation = ({
               <Settings className="w-5 h-5" />
             </button>
           </div>
+
+          {user && onMarkAsRead && (
+            <div className="flex justify-between items-center">
+              <button
+                onClick={onMarkAsRead}
+                className="btn btn-circle btn-sm btn-ghost hover:bg-base-100"
+                aria-label="Tandai sebagai chapter terakhir dibaca"
+                title="Tandai sebagai chapter terakhir dibaca"
+              >
+                {justMarked ? (
+                  <BookmarkCheck className="w-5 h-5 text-success" />
+                ) : (
+                  <Bookmark className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="divider my-0"></div>
@@ -123,8 +148,12 @@ const MobileNavigation = ({
   nextChapter,
   novel,
   onListClick,
-  onSettingsClick
+  onSettingsClick,
+  onMarkAsRead,
+  justMarked
 }: NavProps) => {
+  const { user } = useAuth();
+
   return (
     <div className="btm-nav btm-nav-sm fixed bottom-0 z-50 bg-base-100 border-t border-base-300 shadow-lg">
       {prevChapter ? (
@@ -173,7 +202,22 @@ const MobileNavigation = ({
         <Settings className="w-5 h-5" aria-hidden="true" />
         <span className="btm-nav-label text-xs">Settings</span>
       </button>
-      
+
+      {user && onMarkAsRead && (
+        <button
+          onClick={onMarkAsRead}
+          className="text-base-content"
+          aria-label="Tandai sebagai chapter terakhir dibaca"
+        >
+          {justMarked ? (
+            <BookmarkCheck className="w-5 h-5 text-success" aria-hidden="true" />
+          ) : (
+            <Bookmark className="w-5 h-5" aria-hidden="true" />
+          )}
+          <span className="btm-nav-label text-xs">Tandai</span>
+        </button>
+      )}
+
       {nextChapter ? (
         <Link 
           href={`/novel/${novel.url || novel.id}/chapter/${nextChapter}`}
@@ -203,7 +247,9 @@ const Navigation = ({
   novel,
   isMobile,
   onListClick,
-  onSettingsClick
+  onSettingsClick,
+  onMarkAsRead,
+  justMarked
 }: NavigationProps) => {
   if (isMobile) {
     return (
@@ -213,6 +259,8 @@ const Navigation = ({
         novel={novel}
         onListClick={onListClick}
         onSettingsClick={onSettingsClick}
+        onMarkAsRead={onMarkAsRead}
+        justMarked={justMarked}
       />
     );
   }
@@ -224,6 +272,8 @@ const Navigation = ({
       novel={novel}
       onListClick={onListClick}
       onSettingsClick={onSettingsClick}
+      onMarkAsRead={onMarkAsRead}
+      justMarked={justMarked}
     />
   );
 };

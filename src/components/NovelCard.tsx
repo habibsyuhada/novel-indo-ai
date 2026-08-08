@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Novel, getCoverUrl } from '../lib/supabase';
+import { Novel, getCoverUrl } from '../lib/novel';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
 type NovelCardProps = {

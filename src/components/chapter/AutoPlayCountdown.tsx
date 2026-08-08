@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
-import { NovelChapter } from '../../lib/supabase';
+import { NovelChapter } from '../../lib/novel';
 
 interface AutoPlayCountdownProps {
   isActive: boolean;

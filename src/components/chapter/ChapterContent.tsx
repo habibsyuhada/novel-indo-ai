@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { Novel, NovelChapter, getIllustrationUrl } from '../../lib/supabase';
+import { Novel, NovelChapter, getIllustrationUrl } from '../../lib/novel';
 import styles from '../../styles/chapter.module.css';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';

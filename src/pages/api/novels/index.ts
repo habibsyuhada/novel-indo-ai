@@ -13,6 +13,14 @@ type NovelRow = {
   total_chapters: number;
 };
 
+const SORT_OPTIONS: Record<string, string> = {
+  newest: "n.updated_date DESC",
+  title_asc: "lower(n.name) ASC",
+  title_desc: "lower(n.name) DESC",
+  views: "n.total_view DESC NULLS LAST",
+  trending: "n.total_month_view DESC NULLS LAST",
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method Not Allowed" });
 
@@ -26,6 +34,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const isHiddenRaw = typeof req.query.isHidden === "string" ? req.query.isHidden : "0";
     const isHidden = (isHiddenRaw === "0" || isHiddenRaw === "1") ? isHiddenRaw : "0";
+
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+    const sortKey = typeof req.query.sort === "string" && req.query.sort in SORT_OPTIONS
+      ? req.query.sort
+      : "newest";
+    const orderBy = SORT_OPTIONS[sortKey];
+
+    const params: (string | number)[] = [isHidden];
+    let searchClause = "";
+
+    if (q) {
+      params.push(`%${q}%`);
+      searchClause = `AND (n.name ILIKE $${params.length} OR n.tag ILIKE $${params.length} OR n.genre ILIKE $${params.length})`;
+    }
+
+    params.push(limit, offset);
+    const limitIdx = params.length - 1;
+    const offsetIdx = params.length;
 
     const sql = `
       SELECT
@@ -41,12 +68,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       FROM public.novel n
       LEFT JOIN public.novel_chapter c ON c.novel = n.id
       WHERE n.is_hidden = $1
+      ${searchClause}
       GROUP BY n.id
-      ORDER BY n.updated_date DESC
-      LIMIT $2 OFFSET $3
+      ORDER BY ${orderBy}
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
     `;
 
-    const result = await pool.query<NovelRow>(sql, [isHidden, limit, offset]);
+    const result = await pool.query<NovelRow>(sql, params);
 
     const hasMore = result.rows.length === limit;
     return res.status(200).json({

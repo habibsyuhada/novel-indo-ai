@@ -1,5 +1,5 @@
 import { GetServerSideProps } from 'next';
-import { supabase } from '../lib/supabase';
+import { pool } from '@/lib/db';
 
 const Sitemap = () => {
   // This component doesn't need to render anything
@@ -8,35 +8,14 @@ const Sitemap = () => {
 
 export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   try {
-    // Fetch all novels
-    const { data: novels, error: novelsError } = await supabase
-      .from('novel')
-      .select('id, url, updated_date');
-
-    if (novelsError) throw novelsError;
-
-    // Fetch all chapters with novel URL information
-    // const { data: chapters, error: chaptersError } = await supabase
-    //   .from('novel_chapter')
-    //   .select(`
-    //     novel,
-    //     chapter,
-    //     created_date
-    //   `);
-
-    // if (chaptersError) throw chaptersError;
-
-    // Create a lookup map for novel URLs
-    const novelUrlMap = new Map();
-    if (novels) {
-      novels.forEach(novel => {
-        novelUrlMap.set(novel.id, novel.url || novel.id);
-      });
-    }
+    const novelsResult = await pool.query<{ id: number; url: string | null; updated_date: string }>(
+      'SELECT id, url, updated_date FROM novel'
+    );
+    const novels = novelsResult.rows;
 
     // Set the appropriate header
     res.setHeader('Content-Type', 'text/xml');
-    
+
     // Create sitemap XML
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.bacanovelindo.click';
     // Generate sitemap content
@@ -49,7 +28,7 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
-  
+
   <!-- Novel pages -->
   ${novels.map(novel => `
   <url>
@@ -58,7 +37,7 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>`).join('')}
-  
+
 </urlset>`;
 
     // Send the sitemap
@@ -76,4 +55,4 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   }
 };
 
-export default Sitemap; 
+export default Sitemap;

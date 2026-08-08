@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Novel, NovelChapter } from "../lib/supabase";
+import type { Novel, NovelChapter } from "../lib/novel";
 import { trackChapterView } from "../lib/gtm";
 
 interface UseChapterDataProps {
