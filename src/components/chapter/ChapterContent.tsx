@@ -66,7 +66,7 @@ const ChapterContent = ({
       ref={contentRef}
       itemScope 
       itemType="https://schema.org/Article"
-      className={`flex-1 ${styles.chapterContent}`}
+      className={`flex-1 pb-36 md:pb-6 ${styles.chapterContent}`}
       style={{ fontSize: `${fontSize}px`, overflowX: 'auto', overflowWrap: 'break-word' }}
     >
       <meta itemProp="headline" content={`${novel.name} - Chapter ${chapterData.chapter}: ${chapterData.title}`} />
