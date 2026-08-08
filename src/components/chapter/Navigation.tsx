@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Novel } from '../../lib/novel';
 import { useAuth } from '../../hooks/useAuth';
+import { useVisualViewportOffset } from '../../hooks/useVisualViewportOffset';
 
 interface NavProps {
   prevChapter: number | null;
@@ -153,11 +154,16 @@ const MobileNavigation = ({
   justMarked
 }: NavProps) => {
   const { user } = useAuth();
+  const navRef = useVisualViewportOffset<HTMLDivElement>();
 
   return (
-    <div className="btm-nav btm-nav-sm fixed bottom-0 z-50 bg-base-100 border-t border-base-300 shadow-lg">
+    <div
+      ref={navRef}
+      style={{ transform: 'translateY(var(--vvo-offset, 0px))' }}
+      className="btm-nav btm-nav-sm fixed bottom-0 z-50 bg-base-100 border-t border-base-300 shadow-lg"
+    >
       {prevChapter ? (
-        <Link 
+        <Link
           href={`/novel/${novel.url || novel.id}/chapter/${prevChapter}`}
           className="text-base-content"
           aria-label="Chapter sebelumnya"
