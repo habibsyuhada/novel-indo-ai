@@ -14,3 +14,6 @@ export function isPasswordValid(password: string): boolean {
   if (!/[0-9]/.test(password)) return false;
   return true;
 }
+
+export const COMMENT_MIN_LENGTH = 2;
+export const COMMENT_MAX_LENGTH = 1000;

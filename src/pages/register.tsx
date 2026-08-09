@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { Mail, Lock, User, Check, X } from 'lucide-react';
 import { USERNAME_RE, USERNAME_HINT, PASSWORD_MIN_LENGTH } from '@/lib/validation';
+import { Turnstile } from '@/components/Turnstile';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
@@ -13,8 +13,9 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [registered, setRegistered] = useState(false);
   const { signUp, loading, error } = useAuth();
-  const router = useRouter();
 
   const passwordChecks = {
     length: password.length >= PASSWORD_MIN_LENGTH,
@@ -41,11 +42,15 @@ export default function RegisterPage() {
       setFormError('Konfirmasi password tidak cocok.');
       return;
     }
+    if (!turnstileToken) {
+      setFormError('Selesaikan verifikasi captcha terlebih dahulu.');
+      return;
+    }
 
-    const success = await signUp(email, password, username);
+    const result = await signUp(email, password, username, turnstileToken);
 
-    if (success) {
-      router.push('/');
+    if (result.success) {
+      setRegistered(true);
     }
   };
 
@@ -55,6 +60,24 @@ export default function RegisterPage() {
       {children}
     </li>
   );
+
+  if (registered) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="max-w-md w-full space-y-6 p-8 rounded-xl shadow-xl bg-base-200 border border-base-300 text-center">
+          <Mail className="h-10 w-10 text-primary mx-auto" />
+          <h2 className="text-2xl font-bold text-primary">Cek Email Kamu</h2>
+          <p className="text-base-content/70">
+            Kami sudah mengirim link verifikasi ke <span className="font-medium">{email}</span>. Klik link di email
+            itu untuk mengaktifkan akun kamu sebelum bisa masuk.
+          </p>
+          <Link href="/login" className="link link-primary font-medium">
+            Kembali ke halaman masuk
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center">
@@ -154,6 +177,10 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          <div className="flex justify-center">
+            <Turnstile onToken={setTurnstileToken} />
+          </div>
+
           {(formError || error) && (
             <div className="alert alert-error shadow-lg">
               <div>
@@ -168,7 +195,7 @@ export default function RegisterPage() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !turnstileToken}
               className="btn btn-primary w-full"
             >
               {loading ? (

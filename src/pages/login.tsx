@@ -9,16 +9,32 @@ import { Mail, Lock } from 'lucide-react';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signIn, loading, error } = useAuth();
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const { signIn, loading, error, needsVerification } = useAuth();
   const router = useRouter();
+  const verifyStatus = typeof router.query.verify === 'string' ? router.query.verify : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setResendState('idle');
     const success = await signIn(email, password);
-    
+
     // Hanya redirect jika login berhasil
     if (success) {
       router.push('/');
+    }
+  };
+
+  const handleResend = async () => {
+    setResendState('sending');
+    try {
+      await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+    } finally {
+      setResendState('sent');
     }
   };
 
@@ -28,6 +44,12 @@ export default function LoginPage() {
         <div className="text-center">
           <h2 className="text-3xl font-bold text-primary mb-2">Selamat Datang</h2>
           <p className="text-base-content/70">Masuk untuk melanjutkan membaca novel favoritmu</p>
+          {verifyStatus === 'success' && (
+            <p className="text-sm text-success mt-2">Email berhasil diverifikasi. Silakan masuk.</p>
+          )}
+          {(verifyStatus === 'invalid' || verifyStatus === 'error') && (
+            <p className="text-sm text-error mt-2">Link verifikasi tidak valid atau sudah kedaluwarsa.</p>
+          )}
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -79,6 +101,23 @@ export default function LoginPage() {
                 </svg>
                 <span>{error}</span>
               </div>
+            </div>
+          )}
+
+          {needsVerification && (
+            <div className="text-center">
+              {resendState === 'sent' ? (
+                <p className="text-sm text-base-content/70">Kalau email kamu terdaftar, link baru sudah dikirim.</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resendState === 'sending' || !email}
+                  className="btn btn-sm btn-outline"
+                >
+                  {resendState === 'sending' ? 'Mengirim...' : 'Kirim ulang email verifikasi'}
+                </button>
+              )}
             </div>
           )}
 

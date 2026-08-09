@@ -15,6 +15,7 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   const robots = `# https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Allow: /
+Disallow: /admin
 
 # Sitemap
 Sitemap: ${baseUrl}/sitemap.xml
