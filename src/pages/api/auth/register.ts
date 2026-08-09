@@ -56,7 +56,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [normalizedEmail, passwordHash, name, tokenHash, expiresAt]
     );
 
-    await sendVerificationEmail(normalizedEmail, name, rawToken);
+    // Akun sudah tersimpan di titik ini. Kegagalan kirim email di bawah ini
+    // tidak boleh membuat request ini dianggap gagal total (user sudah
+    // terdaftar) - cukup dicatat, user bisa pakai "kirim ulang" di halaman login.
+    try {
+      await sendVerificationEmail(normalizedEmail, name, rawToken);
+    } catch (emailErr) {
+      console.error("register: gagal mengirim email verifikasi:", emailErr);
+    }
 
     return res.status(201).json({
       message: "Pendaftaran berhasil. Cek email kamu untuk verifikasi sebelum bisa masuk.",
