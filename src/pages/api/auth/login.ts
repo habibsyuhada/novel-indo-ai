@@ -14,8 +14,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
-    const result = await pool.query<{ id: string; email: string; name: string | null; password_hash: string; email_verified: boolean }>(
-      "SELECT id, email, name, password_hash, email_verified FROM app_user WHERE email = $1",
+    const result = await pool.query<{
+      id: string;
+      email: string;
+      name: string | null;
+      password_hash: string;
+      email_verified: boolean;
+      is_admin: boolean;
+    }>(
+      "SELECT id, email, name, password_hash, email_verified, is_admin FROM app_user WHERE email = $1",
       [normalizedEmail]
     );
 
@@ -36,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    const user = { id: row.id, email: row.email, name: row.name };
+    const user = { id: row.id, email: row.email, name: row.name, isAdmin: row.is_admin };
     const token = await signSession({ sub: user.id, email: user.email, name: user.name });
     setSessionCookie(res, token);
 

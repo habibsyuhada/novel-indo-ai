@@ -14,6 +14,7 @@ import { useAuth } from '../../../../hooks/useAuth';
 // Components
 import SEO from '../../../../components/SEO';
 import JsonLd, { generateArticleData, generateBreadcrumbData } from '../../../../components/JsonLd';
+import CommentSection from '../../../../components/CommentSection';
 import ChapterContent from '../../../../components/chapter/ChapterContent';
 import ChapterList from '../../../../components/chapter/ChapterList';
 import Navigation from '../../../../components/chapter/Navigation';
@@ -370,8 +371,10 @@ export default function ChapterPage() {
         </div>
       </div>
       
+      <CommentSection chapterId={chapterData.id} />
+
       {/* TTS Controls */}
-      <TtsControls 
+      <TtsControls
         ttsEnabled={ttsEnabled}
         isPlaying={isPlaying}
         onPlayPause={handlePlayPause}

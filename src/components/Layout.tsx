@@ -4,7 +4,7 @@ import UserSettings from './UserSettings';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import { toggleSettings, setTheme } from '../store/settingsSlice';
-import { Moon, Sun, History } from 'lucide-react';
+import { Moon, Sun, History, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 // import InstallPWA from './InstallPWA';
 
@@ -92,6 +92,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       Riwayat Baca
                     </Link>
                   </li>
+                  {user.isAdmin && (
+                    <li>
+                      <Link href="/admin/comments">
+                        <ShieldCheck className="w-4 h-4" />
+                        Admin
+                      </Link>
+                    </li>
+                  )}
                   <li>
                     <button onClick={() => signOut()}>Keluar</button>
                   </li>
