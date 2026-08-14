@@ -9,6 +9,7 @@ import { toggleSettings } from '../../../../store/settingsSlice';
 import useChapterData from '../../../../hooks/useChapterData';
 import useTts from '../../../../hooks/useTts';
 import useReadingProgress from '../../../../hooks/useReadingProgress';
+import useScrollMemory from '../../../../hooks/useScrollMemory';
 import { useAuth } from '../../../../hooks/useAuth';
 
 // Components
@@ -51,6 +52,9 @@ export default function ChapterPage() {
   
   // Reading progress (scroll indicator)
   const readingProgress = useReadingProgress({ contentElement });
+
+  // Simpan & pulihkan posisi scroll terakhir per chapter (localStorage), biar gak hilang jejak kalau ke-refresh
+  useScrollMemory({ novelId: novel?.id, chapter: chapterData?.chapter, ready: !loading && !!chapterData });
 
   // Reading checkpoint (last chapter read)
   const { user } = useAuth();
