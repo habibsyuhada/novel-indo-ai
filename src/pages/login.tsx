@@ -90,6 +90,11 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
+              <label className="label">
+                <Link href="/forgot-password" className="label-text-alt link link-primary">
+                  Lupa password?
+                </Link>
+              </label>
             </div>
           </div>
 
