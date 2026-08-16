@@ -90,7 +90,7 @@ const ChapterContent = ({
         {paragraphs.map((paragraph: string, index: number) => {
           const imgMatch = paragraph.trim().match(/^\[IMG:(.*?)(?:\|(.*?))?\]$/);
           if (imgMatch) {
-          const illustrationUrl = imgMatch ? getIllustrationUrl(novel.id, chapterData.chapter, imgMatch[1]) : null;
+          const illustrationUrl = imgMatch ? getIllustrationUrl(novel.url, imgMatch[1]) : null;
             return (
               <figure key={index} className="my-6 flex flex-col items-center">
                 {illustrationUrl ? (
