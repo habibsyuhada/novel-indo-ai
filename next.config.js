@@ -11,6 +11,21 @@ const nextConfig = {
         hostname: "storage.bacanovelindo.click",
         pathname: "/novel-covers/**",
       },
+      {
+        protocol: "https",
+        hostname: "storage.bacanovelindo.click",
+        pathname: "/novel-illustration/**",
+      },
+      {
+        protocol: "https",
+        hostname: "storage.bacanovelindo.casa",
+        pathname: "/novel-covers/**",
+      },
+      {
+        protocol: "https",
+        hostname: "storage.bacanovelindo.casa",
+        pathname: "/novel-illustration/**",
+      },
     ],
     unoptimized: true,
   },

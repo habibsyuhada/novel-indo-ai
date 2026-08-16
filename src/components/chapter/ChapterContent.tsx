@@ -1,9 +1,10 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { Novel, NovelChapter, getIllustrationUrl } from '../../lib/novel';
 import styles from '../../styles/chapter.module.css';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
 import Image from 'next/image';
+import ImageLightbox from './ImageLightbox';
 
 interface ChapterContentProps {
   novel: Novel;
@@ -28,7 +29,8 @@ const ChapterContent = ({
 }: ChapterContentProps) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const paragraphRefs = useRef<(HTMLParagraphElement | null)[]>([]);
-  
+  const [openImage, setOpenImage] = useState<{ src: string; alt: string; caption?: string } | null>(null);
+
   // Get TTS auto-scroll settings from Redux
   const { ttsAutoScroll, ttsScrollPosition, ttsScrollBehavior } = useSelector(
     (state: RootState) => state.settings
@@ -92,14 +94,27 @@ const ChapterContent = ({
             return (
               <figure key={index} className="my-6 flex flex-col items-center">
                 {illustrationUrl ? (
-                  <Image
-                    src={illustrationUrl}
-                    alt={imgMatch[2] || 'Ilustrasi chapter'}
-                    width={800}
-                    height={450}
-                    className="max-w-full h-auto rounded"
-                    loading="lazy"
-                  />
+                  <button
+                    type="button"
+                    className="cursor-zoom-in border-0 bg-transparent p-0"
+                    onClick={() =>
+                      setOpenImage({
+                        src: illustrationUrl,
+                        alt: imgMatch[2] || 'Ilustrasi chapter',
+                        caption: imgMatch[2],
+                      })
+                    }
+                    aria-label="Buka gambar"
+                  >
+                    <Image
+                      src={illustrationUrl}
+                      alt={imgMatch[2] || 'Ilustrasi chapter'}
+                      width={800}
+                      height={450}
+                      className="max-w-full h-auto rounded"
+                      loading="lazy"
+                    />
+                  </button>
                 ) : null}
                 {imgMatch[2] && (
                   <figcaption className="text-sm text-muted-foreground mt-2 text-center">
@@ -129,6 +144,15 @@ const ChapterContent = ({
           );
         })}
       </section>
+
+      {openImage && (
+        <ImageLightbox
+          src={openImage.src}
+          alt={openImage.alt}
+          caption={openImage.caption}
+          onClose={() => setOpenImage(null)}
+        />
+      )}
     </article>
   );
 };
